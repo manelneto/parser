@@ -1,12 +1,7 @@
 import Data.Map (Map, fromList, toList, (!), member, insert, empty, lookup)
 import Data.List (sort, intercalate)
 
--- PFL 2023/24 - Haskell practical assignment quickstart
--- Updated on 27/12/2023
 
--- Part 1
-
--- Do not modify our definition of Inst and Code
 data Inst =
   Push Integer | Add | Mult | Sub | Tru | Fals | Equ | Le | And | Neg | Fetch String | Store String | Noop |
   Branch Code Code | Loop Code Code
@@ -15,19 +10,19 @@ data Inst =
 type Code = [Inst]
 
 -- Stack is a list of either Integers or Bools
-
 type Stack = [Either Integer Bool]
 
--- Storage is a list of variables and their values in the form (VarName, Value)
+-- State is a map from a string to either an Integer or a Bool
 type State = Map String (Either Integer Bool)
 
 
-
--- createEmptyStack :: Stack
--- Function that returns an empty Stack
+-- returns an empty Stack
 createEmptyStack :: Stack 
 createEmptyStack = []
 
+-- returns an empty State 
+createEmptyState :: State 
+createEmptyState = empty
 
 -- Returns the string representation of a stack in the form "x,y,z", where x is the top of the stack
 stack2Str :: Stack -> String
@@ -39,14 +34,9 @@ stack2Str (h:t)
   | otherwise = case h of
       Left x -> show x ++ "," ++ stack2Str t
       Right x -> show x ++ "," ++ stack2Str t
-    
-
---  |||||||||||||||||||||||||||||||||||
---                  State 
---  |||||||||||||||||||||||||||||||||||
-
-createEmptyState :: State 
-createEmptyState = empty
+  
+-- Returns the string representation of a state in the form "x=1,y=False,z=2", 
+-- where x, y and z are the variables in the state, ordered alphabetically
 
 state2Str :: State -> String
 state2Str state = case toList state of
@@ -55,6 +45,9 @@ state2Str state = case toList state of
     showValue :: Either Integer Bool -> String
     showValue (Left intVal) = show intVal
     showValue (Right boolVal) = show boolVal
+
+-- Runs a list of instructions, returning as output an empty code list,
+-- a stack and the output values in the storage
 
 run :: (Code, Stack, State) -> (Code, Stack, State)
 run ([], stack, state) = ([], stack, state)
@@ -76,6 +69,11 @@ run (h:t, stack, state) = case h of
   And -> run (t, myAnd stack, state)
 
 
+-- Instructions
+
+
+-- Add the top two integer values of the stack, respectively, 
+-- and push the result onto the top of the stack
 add :: Stack -> Stack
 add [] = error "Run-time error"
 add [x] = error "Run-time error"
@@ -83,6 +81,9 @@ add (x:y:t) = case (x, y) of
   (Left x, Left y) -> Left (x + y):t
   _ -> error "Run-time error"
 
+
+-- Multiply the top two integer values of the stack, respectively,
+-- and push the result onto the top of the stack
 mult :: Stack -> Stack
 mult [] = error "Run-time error"
 mult [x] = error "Run-time error"
@@ -90,6 +91,9 @@ mult (x:y:t) = case (x, y) of
   (Left x, Left y) -> Left (x * y):t
   _ -> error "Run-time error"
 
+
+-- Subtract the subtracts the topmost element of the stack with the second topmost element,
+-- and push the result onto the top of the stack
 sub :: Stack -> Stack
 sub [] = error "Run-time error"
 sub [x] = error "Run-time error"
@@ -97,6 +101,9 @@ sub (x:y:t) = case (x, y) of
   (Left x, Left y) -> Left (x - y):t
   _ -> error "Run-time error"
 
+
+-- Compare the top two values of the stack for equality,
+-- and push a boolean with the comparison result onto the top of the stack
 eq :: Stack -> Stack
 eq [] = error "Run-time error"
 eq [x] = error "Run-time error"
@@ -105,6 +112,9 @@ eq (x:y:t) = case (x, y) of
   (Right x, Right y) -> Right (x == y):t
   _ -> error "Run-time error"
 
+
+-- Determines whether the topmost stack element is less or equal to the second topmost element,
+-- and push a boolean with the comparison result onto the top of the stack
 le :: Stack -> Stack
 le [] = error "Run-time error"
 le [x] = error "Run-time error"
@@ -113,15 +123,23 @@ le (x:y:t) = case (x, y) of
   _ -> error "Run-time error"
 
 
+-- Pushes an integer onto the top of the stack
 push :: Integer -> Stack -> Stack
 push x s = Left x:s
 
+
+-- Pushes the boolean value True onto the top of the stack
 true :: Stack -> Stack
 true s = Right True:s
 
+
+-- Pushes the boolean value False onto the top of the stack
 false :: Stack -> Stack
 false s = Right False:s
 
+
+-- Pushes the value bound to x onto the stack.
+-- If x is not bound, raises a run-time error
 fetch :: String -> Stack -> State -> Stack
 fetch x s state = case Data.Map.lookup x state of
   Just val -> case val of
@@ -129,12 +147,19 @@ fetch x s state = case Data.Map.lookup x state of
     Right boolVal -> Right boolVal : s
   Nothing -> error "Run-time error"
 
+
+-- Pops the topmost element of the stack,
+-- and updates the storage so that the popped value is bound to x.
 store :: String -> Stack -> State -> (Stack, State)
 store x [] state = error "Run-time error"
 store x (h:t) state = 
     (t, insert x h state)
 
 
+-- If the top of the stack is the value True, 
+-- the stack is popped and c1 is to be executed next.
+-- Otherwise, if the top element of the stack is the value False,
+-- then it will be popped and c2 will be executed next.
 branch :: Code -> Code -> Stack -> (Code, Stack)
 branch c1 c2 [] = error "Run-time error"
 branch c1 c2 (h:t) = case h of
@@ -142,15 +167,25 @@ branch c1 c2 (h:t) = case h of
   Right False -> (c2, t)
   _ -> error "Run-time error"
 
+
+-- Writes c1 to the beggining of the code list,
+-- followed by a branch instruction that executes c2 followed by the loop instruction itself.
+-- or a Noop 
 loop :: Code -> Code -> Code
 loop c1 c2 = c1 ++ [Branch (c2 ++ [Loop c1 c2]) [Noop]]
 
+
+-- Negates the topmost boolean value of the stack,
+-- and pushes the result onto the top of the stack
 neg :: Stack -> Stack                   -- Ver caso Inteiro ????
 neg [] = error "Run-time error"
 neg (h:t) = case h of
   Right x -> Right (not x):t
   _ -> error "Run-time error"
 
+
+-- Pops the two top values of the stack,
+-- and pushes the result of the logical operation AND between them if they are both booleans.
 myAnd :: Stack -> Stack
 myAnd [] = error "Run-time error"
 myAnd [x] = error "Run-time error"
