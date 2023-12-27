@@ -90,11 +90,9 @@ run ((h:t), stack, state) = case h of
   Fals -> run (t, false stack, state)
   Fetch x -> run (t, (fetch x stack state), state)
   Store x -> run (t, fst stackState, snd stackState) where  stackState = store x stack state
-  Branch c1 c2 -> run (c ++ t, s, state) where (c, s) = branch c1 c2 stack -- adicionei ++ 
-
-
-
-
+  Branch c1 c2 -> run (c ++ t, s, state) where (c, s) = branch c1 c2 stack  
+  Noop -> run (t, stack, state)
+  Loop c1 c2 -> run(c ++ t, stack, state) where c = loop c1 c2
 
 
 add :: Stack -> Stack
@@ -164,14 +162,8 @@ branch c1 c2 (Stack (h:t)) = case h of
   Right False -> (c2, Stack t)
   _ -> error "Run-time error"
 
-loop :: Code -> Code -> Stack -> (Code, Stack)
-loop c1 c2 (Stack []) = error "Run-time error"
-loop c1 c2 (Stack (h:t)) = case h of
-  Right True -> (c1 ++ [Branch c2 [Loop c1 c2], Noop], Stack t)  -- Ver Isto
-  Right False -> (c2, Stack t)
-  _ -> error "Run-time error"
-
-
+loop :: Code -> Code -> Code
+loop c1 c2 = c1 ++ [Branch (c2 ++ [Loop c1 c2]) [Noop]]
 
 
 
@@ -182,6 +174,7 @@ testAssembler :: Code -> (String, String)
 testAssembler code = (stack2Str stack, state2Str state)
   where (_,stack,state) = run(code, createEmptyStack, createEmptyState)
 
+--
 -- Examples:
 -- testAssembler [Push 10,Push 4,Push 3,Sub,Mult] == ("-10","")
 -- testAssembler [Fals,Push 3,Tru,Store "var",Store "a", Store "someVar"] == ("","a=3,someVar=False,var=True")
