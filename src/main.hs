@@ -1,5 +1,6 @@
 import Data.Map (Map)
 import qualified Data.Map as Map
+import GHC.IO.Encoding.Failure (codingFailureModeSuffix)
 -- PFL 2023/24 - Haskell practical assignment quickstart
 -- Updated on 27/12/2023
 
@@ -87,6 +88,10 @@ run ((h:t), stack, state) = case h of
   Push n -> run (t, push n stack, state)
   Tru -> run (t, true stack, state)
   Fals -> run (t, false stack, state)
+  Fetch x -> run (t, (fetch x stack state), state)
+  Store x -> run (t, fst stackState, snd stackState) where  stackState = store x stack state
+  Branch c1 c2 -> run (c ++ t, s, state) where (c, s) = branch c1 c2 stack -- adicionei ++ 
+
 
 
 
@@ -152,7 +157,19 @@ store x (Stack []) (State s) = error "Run-time error"
 store x (Stack (h:t)) (State s) = 
   (Stack t, State ((x, h):s))
 
+branch :: Code -> Code -> Stack -> (Code, Stack)
+branch c1 c2 (Stack []) = error "Run-time error"
+branch c1 c2 (Stack (h:t)) = case h of
+  Right True -> (c1, Stack t)
+  Right False -> (c2, Stack t)
+  _ -> error "Run-time error"
 
+loop :: Code -> Code -> Stack -> (Code, Stack)
+loop c1 c2 (Stack []) = error "Run-time error"
+loop c1 c2 (Stack (h:t)) = case h of
+  Right True -> (c1 ++ [Branch c2 [Loop c1 c2], Noop], Stack t)  -- Ver Isto
+  Right False -> (c2, Stack t)
+  _ -> error "Run-time error"
 
 
 
