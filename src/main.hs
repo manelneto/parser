@@ -16,13 +16,13 @@ type Code = [Inst]
 
 -- Stack is a list of either Integers or Bools
 
-data Stack = Stack [Either Integer Bool]
+type Stack = [Either Integer Bool]
 
 -- Storage is a list of variables and their values in the form (VarName, Value)
 data State = State (Map String (Either Integer Bool))
 
 myPush:: Either Integer Bool -> Stack -> Stack
-myPush x (Stack s) = Stack (x:s)
+myPush x s = x:s
 
 --  |||||||||||||||||||||||||||||||||||
 --                  Stack
@@ -31,20 +31,19 @@ myPush x (Stack s) = Stack (x:s)
 -- createEmptyStack :: Stack
 -- Function that returns an empty Stack
 createEmptyStack :: Stack 
-createEmptyStack = Stack []
-
+createEmptyStack = []
 
 
 -- Returns the string representation of a stack in the form "x,y,z", where x is the top of the stack
 stack2Str :: Stack -> String
-stack2Str (Stack []) = ""
-stack2Str (Stack (h:t))
+stack2Str [] = ""
+stack2Str (h:t)
   | null t = case h of
-      Left x -> show x ++ stack2Str (Stack t)
-      Right x -> show x ++ stack2Str (Stack t)
+      Left x -> show x ++ stack2Str t
+      Right x -> show x ++ stack2Str t
   | otherwise = case h of
-      Left x -> show x ++ "," ++ stack2Str (Stack t)
-      Right x -> show x ++ "," ++ stack2Str (Stack t)
+      Left x -> show x ++ "," ++ stack2Str t
+      Right x -> show x ++ "," ++ stack2Str t
     
 
 --  |||||||||||||||||||||||||||||||||||
@@ -64,7 +63,7 @@ state2Str (State m) = case toList m of
 
 run :: (Code, Stack, State) -> (Code, Stack, State)
 run ([], stack, state) = ([], stack, state)
-run ((h:t), stack, state) = case h of
+run (h:t, stack, state) = case h of
   Add -> run (t, add stack, state)
   Mult -> run (t, mult stack, state)
   Sub -> run (t, sub stack, state)
@@ -83,85 +82,85 @@ run ((h:t), stack, state) = case h of
 
 
 add :: Stack -> Stack
-add (Stack []) = error "Run-time error"
-add (Stack [x]) = error "Run-time error"
-add (Stack (x:y:t)) = case (x, y) of
-  (Left x, Left y) -> Stack (Left (x + y):t)
+add [] = error "Run-time error"
+add [x] = error "Run-time error"
+add (x:y:t) = case (x, y) of
+  (Left x, Left y) -> Left (x + y):t
   _ -> error "Run-time error"
 
 mult :: Stack -> Stack
-mult (Stack []) = error "Run-time error"
-mult (Stack [x]) = error "Run-time error"
-mult (Stack (x:y:t)) = case (x, y) of
-  (Left x, Left y) -> Stack (Left (x * y):t)
+mult [] = error "Run-time error"
+mult [x] = error "Run-time error"
+mult (x:y:t) = case (x, y) of
+  (Left x, Left y) -> Left (x * y):t
   _ -> error "Run-time error"
 
 sub :: Stack -> Stack
-sub (Stack []) = error "Run-time error"
-sub (Stack [x]) = error "Run-time error"
-sub (Stack (x:y:t)) = case (x, y) of
-  (Left x, Left y) -> Stack (Left (x - y):t)
+sub [] = error "Run-time error"
+sub [x] = error "Run-time error"
+sub (x:y:t) = case (x, y) of
+  (Left x, Left y) -> Left (x - y):t
   _ -> error "Run-time error"
 
 eq :: Stack -> Stack
-eq (Stack []) = error "Run-time error"
-eq (Stack [x]) = error "Run-time error"
-eq (Stack (x:y:t)) = case (x, y) of
-  (Left x, Left y) -> Stack (Right (x == y):t)
-  (Right x, Right y) -> Stack (Right (x == y):t)
+eq [] = error "Run-time error"
+eq [x] = error "Run-time error"
+eq (x:y:t) = case (x, y) of
+  (Left x, Left y) -> Right (x == y):t
+  (Right x, Right y) -> Right (x == y):t
   _ -> error "Run-time error"
 
 le :: Stack -> Stack
-le (Stack []) = error "Run-time error"
-le (Stack [x]) = error "Run-time error"
-le (Stack (x:y:t)) = case (x, y) of
-  (Left x, Left y) -> Stack (Right (x <= y):t)
+le [] = error "Run-time error"
+le [x] = error "Run-time error"
+le (x:y:t) = case (x, y) of
+  (Left x, Left y) -> Right (x <= y):t
   _ -> error "Run-time error"
 
 
 push :: Integer -> Stack -> Stack
-push x (Stack s) = Stack (Left x:s)
+push x s = Left x:s
 
 true :: Stack -> Stack
-true (Stack s) = Stack (Right True:s)
+true s = Right True:s
 
 false :: Stack -> Stack
-false (Stack s) = Stack (Right False:s)
+false s = Right False:s
 
 fetch :: String -> Stack -> State -> Stack
-fetch x (Stack s) (State m) = case Data.Map.lookup x m of
+fetch x s (State m) = case Data.Map.lookup x m of
   Just val -> case val of
-    Left intVal -> Stack (Left intVal : s)
-    Right boolVal -> Stack (Right boolVal : s)
+    Left intVal -> Left intVal : s
+    Right boolVal -> Right boolVal : s
   Nothing -> error "Run-time error"
 
 store :: String -> Stack -> State -> (Stack, State)
-store x (Stack []) (State s) = error "Run-time error"
-store x (Stack (h:t)) (State s) = 
-    (Stack t, State (insert x h s))
+store x [] (State s) = error "Run-time error"
+store x (h:t) (State s) = 
+    (t, State (insert x h s))
 
 
 branch :: Code -> Code -> Stack -> (Code, Stack)
-branch c1 c2 (Stack []) = error "Run-time error"
-branch c1 c2 (Stack (h:t)) = case h of
-  Right True -> (c1, Stack t)
-  Right False -> (c2, Stack t)
+branch c1 c2 [] = error "Run-time error"
+branch c1 c2 (h:t) = case h of
+  Right True -> (c1, t)
+  Right False -> (c2, t)
   _ -> error "Run-time error"
 
 loop :: Code -> Code -> Code
 loop c1 c2 = c1 ++ [Branch (c2 ++ [Loop c1 c2]) [Noop]]
 
 neg :: Stack -> Stack                   -- Ver caso Inteiro ????
-neg (Stack []) = error "Run-time error"
-neg (Stack (h:t)) = case h of
-  Right x -> Stack (Right (not x):t)
+neg [] = error "Run-time error"
+neg (h:t) = case h of
+  Right x -> Right (not x):t
   _ -> error "Run-time error"
 
 myAnd :: Stack -> Stack
-myAnd (Stack []) = error "Run-time error"
-myAnd (Stack [x]) = error "Run-time error"
-myAnd (Stack (x:y:t)) = case (x, y) of
-  (Right x, Right y) -> Stack (Right (x && y):t)
+myAnd [] = error "Run-time error"
+myAnd [x] = error "Run-time error"
+myAnd (x:y:t) = case (x, y) of
+  (Right x, Right y) -> Right (x && y):t
   _ -> error "Run-time error"
 
 
