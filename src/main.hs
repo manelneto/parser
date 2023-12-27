@@ -1,12 +1,7 @@
 import Data.Map (Map, fromList, toList, (!), member, insert, empty, lookup)
-import Data.List (sort)
+import Data.List (sort, intercalate)
 
--- PFL 2023/24 - Haskell practical assignment quickstart
--- Updated on 27/12/2023
 
--- Part 1
-
--- Do not modify our definition of Inst and Code
 data Inst =
   Push Integer | Add | Mult | Sub | Tru | Fals | Equ | Le | And | Neg | Fetch String | Store String | Noop |
   Branch Code Code | Loop Code Code
@@ -15,71 +10,48 @@ data Inst =
 type Code = [Inst]
 
 -- Stack is a list of either Integers or Bools
+type Stack = [Either Integer Bool]
 
-data Stack = Stack [Either Integer Bool]
-
--- Storage is a list of variables and their values in the form (VarName, Value)
-data State = State [(String, Either Integer Bool)]
-
+-- State is a map from a string to either an Integer or a Bool
+type State = Map String (Either Integer Bool)
 
 
-myStack :: Stack
-myStack = myPush (Left 2) (Stack [Left 1])
-
-myStack2 :: Stack
-myStack2 = myPush (Left 2) (Stack [Left 1])
-
-myState :: State
-myState = State [("x", Left 1), ("a", Right True)]
-
-
-myPush:: Either Integer Bool -> Stack -> Stack
-myPush x (Stack s) = Stack (x:s)
-
---  |||||||||||||||||||||||||||||||||||
---                  Stack
---  |||||||||||||||||||||||||||||||||||
-
--- createEmptyStack :: Stack
--- Function that returns an empty Stack
+-- returns an empty Stack
 createEmptyStack :: Stack 
-createEmptyStack = Stack []
+createEmptyStack = []
 
-
+-- returns an empty State 
+createEmptyState :: State 
+createEmptyState = empty
 
 -- Returns the string representation of a stack in the form "x,y,z", where x is the top of the stack
 stack2Str :: Stack -> String
-stack2Str (Stack []) = ""
-stack2Str (Stack (h:t))
+stack2Str [] = ""
+stack2Str (h:t)
   | null t = case h of
-      Left x -> show x ++ stack2Str (Stack t)
-      Right x -> show x ++ stack2Str (Stack t)
+      Left x -> show x ++ stack2Str t
+      Right x -> show x ++ stack2Str t
   | otherwise = case h of
-      Left x -> show x ++ "," ++ stack2Str (Stack t)
-      Right x -> show x ++ "," ++ stack2Str (Stack t)
-    
+      Left x -> show x ++ "," ++ stack2Str t
+      Right x -> show x ++ "," ++ stack2Str t
+  
+-- Returns the string representation of a state in the form "x=1,y=False,z=2", 
+-- where x, y and z are the variables in the state, ordered alphabetically
 
---  |||||||||||||||||||||||||||||||||||
---                  State 
---  |||||||||||||||||||||||||||||||||||
+state2Str :: State -> String
+state2Str state = case toList state of
+  [] -> ""
+  lst -> intercalate "," $ map (\(x, y) -> x ++ "=" ++ showValue y) lst  where
+    showValue :: Either Integer Bool -> String
+    showValue (Left intVal) = show intVal
+    showValue (Right boolVal) = show boolVal
 
-createEmptyState :: State 
-createEmptyState = State []
-
-state2Str :: State -> String  -- TODO: Sorting
-state2Str (State []) = ""
-state2Str (State l)
-  | null t = case h of 
-      (x, Left y) -> x ++ "=" ++ show y ++ state2Str (State t)
-      (x, Right y) -> x ++ "=" ++ show y ++ state2Str (State t)
-  | otherwise = case h of
-      (x, Left y) -> x ++ "=" ++ show y ++ "," ++ state2Str (State t)
-      (x, Right y) -> x ++ "=" ++ show y ++ "," ++ state2Str (State t)
-  where (h:t) = sort l
+-- Runs a list of instructions, returning as output an empty code list,
+-- a stack and the output values in the storage
 
 run :: (Code, Stack, State) -> (Code, Stack, State)
 run ([], stack, state) = ([], stack, state)
-run ((h:t), stack, state) = case h of
+run (h:t, stack, state) = case h of
   Add -> run (t, add stack, state)
   Mult -> run (t, mult stack, state)
   Sub -> run (t, sub stack, state)
@@ -88,7 +60,7 @@ run ((h:t), stack, state) = case h of
   Push n -> run (t, push n stack, state)
   Tru -> run (t, true stack, state)
   Fals -> run (t, false stack, state)
-  Fetch x -> run (t, (fetch x stack state), state)
+  Fetch x -> run (t, fetch x stack state, state)
   Store x -> run (t, fst stackState, snd stackState) where  stackState = store x stack state
   Branch c1 c2 -> run (c ++ t, s, state) where (c, s) = branch c1 c2 stack  
   Noop -> run (t, stack, state)
@@ -97,89 +69,128 @@ run ((h:t), stack, state) = case h of
   And -> run (t, myAnd stack, state)
 
 
+-- Instructions
+
+
+-- Add the top two integer values of the stack, respectively, 
+-- and push the result onto the top of the stack
 add :: Stack -> Stack
-add (Stack []) = error "Run-time error"
-add (Stack [x]) = error "Run-time error"
-add (Stack (x:y:t)) = case (x, y) of
-  (Left x, Left y) -> Stack (Left (x + y):t)
+add [] = error "Run-time error"
+add [x] = error "Run-time error"
+add (x:y:t) = case (x, y) of
+  (Left x, Left y) -> Left (x + y):t
   _ -> error "Run-time error"
 
+
+-- Multiply the top two integer values of the stack, respectively,
+-- and push the result onto the top of the stack
 mult :: Stack -> Stack
-mult (Stack []) = error "Run-time error"
-mult (Stack [x]) = error "Run-time error"
-mult (Stack (x:y:t)) = case (x, y) of
-  (Left x, Left y) -> Stack (Left (x * y):t)
+mult [] = error "Run-time error"
+mult [x] = error "Run-time error"
+mult (x:y:t) = case (x, y) of
+  (Left x, Left y) -> Left (x * y):t
   _ -> error "Run-time error"
 
+
+-- Subtract the subtracts the topmost element of the stack with the second topmost element,
+-- and push the result onto the top of the stack
 sub :: Stack -> Stack
-sub (Stack []) = error "Run-time error"
-sub (Stack [x]) = error "Run-time error"
-sub (Stack (x:y:t)) = case (x, y) of
-  (Left x, Left y) -> Stack (Left (x - y):t)
+sub [] = error "Run-time error"
+sub [x] = error "Run-time error"
+sub (x:y:t) = case (x, y) of
+  (Left x, Left y) -> Left (x - y):t
   _ -> error "Run-time error"
 
+
+-- Compare the top two values of the stack for equality,
+-- and push a boolean with the comparison result onto the top of the stack
 eq :: Stack -> Stack
-eq (Stack []) = error "Run-time error"
-eq (Stack [x]) = error "Run-time error"
-eq (Stack (x:y:t)) = case (x, y) of
-  (Left x, Left y) -> Stack (Right (x == y):t)
-  (Right x, Right y) -> Stack (Right (x == y):t)
+eq [] = error "Run-time error"
+eq [x] = error "Run-time error"
+eq (x:y:t) = case (x, y) of
+  (Left x, Left y) -> Right (x == y):t
+  (Right x, Right y) -> Right (x == y):t
   _ -> error "Run-time error"
 
+
+-- Determines whether the topmost stack element is less or equal to the second topmost element,
+-- and push a boolean with the comparison result onto the top of the stack
 le :: Stack -> Stack
-le (Stack []) = error "Run-time error"
-le (Stack [x]) = error "Run-time error"
-le (Stack (x:y:t)) = case (x, y) of
-  (Left x, Left y) -> Stack (Right (x <= y):t)
+le [] = error "Run-time error"
+le [x] = error "Run-time error"
+le (x:y:t) = case (x, y) of
+  (Left x, Left y) -> Right (x <= y):t
   _ -> error "Run-time error"
 
 
+-- Pushes an integer onto the top of the stack
 push :: Integer -> Stack -> Stack
-push x (Stack s) = Stack (Left x:s)
+push x s = Left x:s
 
+
+-- Pushes the boolean value True onto the top of the stack
 true :: Stack -> Stack
-true (Stack s) = Stack (Right True:s)
+true s = Right True:s
 
+
+-- Pushes the boolean value False onto the top of the stack
 false :: Stack -> Stack
-false (Stack s) = Stack (Right False:s)
+false s = Right False:s
 
+
+-- Pushes the value bound to x onto the stack.
+-- If x is not bound, raises a run-time error
 fetch :: String -> Stack -> State -> Stack
-fetch x (Stack s) (State []) = error "Run-time error"
-fetch x (Stack s) (State ((y, v):t)) 
-  | x == y = case v of
-    Left x -> Stack (Left x:s)
-    Right x -> Stack (Right x:s)
-  | otherwise =
-    fetch x (Stack s) (State t)
+fetch x s state = case Data.Map.lookup x state of
+  Just val -> case val of
+    Left intVal -> Left intVal : s
+    Right boolVal -> Right boolVal : s
+  Nothing -> error "Run-time error"
 
+
+-- Pops the topmost element of the stack,
+-- and updates the storage so that the popped value is bound to x.
 store :: String -> Stack -> State -> (Stack, State)
-store x (Stack []) (State s) = error "Run-time error"
-store x (Stack (h:t)) (State s) = 
-    (Stack t, State (toList (insert x h (fromList s))))
+store x [] state = error "Run-time error"
+store x (h:t) state = 
+    (t, insert x h state)
 
-  
 
+-- If the top of the stack is the value True, 
+-- the stack is popped and c1 is to be executed next.
+-- Otherwise, if the top element of the stack is the value False,
+-- then it will be popped and c2 will be executed next.
 branch :: Code -> Code -> Stack -> (Code, Stack)
-branch c1 c2 (Stack []) = error "Run-time error"
-branch c1 c2 (Stack (h:t)) = case h of
-  Right True -> (c1, Stack t)
-  Right False -> (c2, Stack t)
+branch c1 c2 [] = error "Run-time error"
+branch c1 c2 (h:t) = case h of
+  Right True -> (c1, t)
+  Right False -> (c2, t)
   _ -> error "Run-time error"
 
+
+-- Writes c1 to the beggining of the code list,
+-- followed by a branch instruction that executes c2 followed by the loop instruction itself.
+-- or a Noop 
 loop :: Code -> Code -> Code
 loop c1 c2 = c1 ++ [Branch (c2 ++ [Loop c1 c2]) [Noop]]
 
+
+-- Negates the topmost boolean value of the stack,
+-- and pushes the result onto the top of the stack
 neg :: Stack -> Stack                   -- Ver caso Inteiro ????
-neg (Stack []) = error "Run-time error"
-neg (Stack (h:t)) = case h of
-  Right x -> Stack (Right (not x):t)
+neg [] = error "Run-time error"
+neg (h:t) = case h of
+  Right x -> Right (not x):t
   _ -> error "Run-time error"
 
+
+-- Pops the two top values of the stack,
+-- and pushes the result of the logical operation AND between them if they are both booleans.
 myAnd :: Stack -> Stack
-myAnd (Stack []) = error "Run-time error"
-myAnd (Stack [x]) = error "Run-time error"
-myAnd (Stack (x:y:t)) = case (x, y) of
-  (Right x, Right y) -> Stack (Right (x && y):t)
+myAnd [] = error "Run-time error"
+myAnd [x] = error "Run-time error"
+myAnd (x:y:t) = case (x, y) of
+  (Right x, Right y) -> Right (x && y):t
   _ -> error "Run-time error"
 
 
@@ -190,21 +201,53 @@ testAssembler code = (stack2Str stack, state2Str state)
 
 --
 -- Examples:
--- certo testAssembler [Push 10,Push 4,Push 3,Sub,Mult] == ("-10","")
--- certo testAssembler [Fals,Push 3,Tru,Store "var",Store "a", Store "someVar"] == ("","a=3,someVar=False,var=True")
--- certo testAssembler [Fals,Store "var",Fetch "var"] == ("False","var=False")
--- certo testAssembler [Push (-20),Tru,Fals] == ("False,True,-20","")
--- certo testAssembler [Push (-20),Tru,Tru,Neg] == ("False,True,-20","")
--- certo testAssembler [Push (-20),Tru,Tru,Neg,Equ] == ("False,-20","")
--- certo testAssembler [Push (-20),Push (-21), Le] == ("True","")
--- certo testAssembler [Push 5,Store "x",Push 1,Fetch "x",Sub,Store "x"] == ("","x=4")
--- certo testAssembler [Push 10,Store "i",Push 1,Store "fact",Loop [Push 1,Fetch "i",Equ,Neg] [Fetch "i",Fetch "fact",Mult,Store "fact",Push 1,Fetch "i",Sub,Store "i"]] == ("","fact=3628800,i=1")
+-- Teste 1 certo testAssembler [Push 10,Push 4,Push 3,Sub,Mult] == ("-10","")
+-- Teste 2 certo testAssembler [Fals,Push 3,Tru,Store "var",Store "a", Store "someVar"] == ("","a=3,someVar=False,var=True")
+-- Teste 3 certo testAssembler [Fals,Store "var",Fetch "var"] == ("False","var=False")
+-- Teste 4 certo testAssembler [Push (-20),Tru,Fals] == ("False,True,-20","")
+-- Teste 5 certo testAssembler [Push (-20),Tru,Tru,Neg] == ("False,True,-20","")
+-- Teste 6 certo testAssembler [Push (-20),Tru,Tru,Neg,Equ] == ("False,-20","")
+-- Teste 7 certo testAssembler [Push (-20),Push (-21), Le] == ("True","")
+-- Teste 8 certo testAssembler [Push 5,Store "x",Push 1,Fetch "x",Sub,Store "x"] == ("","x=4")
+-- Teste 9 certo testAssembler [Push 10,Store "i",Push 1,Store "fact",Loop [Push 1,Fetch "i",Equ,Neg] [Fetch "i",Fetch "fact",Mult,Store "fact",Push 1,Fetch "i",Sub,Store "i"]] == ("","fact=3628800,i=1")
+
 -- If you test:
 -- testAssembler [Push 1,Push 2,And]
 -- You should get an exception with the string: "Run-time error"
 -- If you test:
 -- testAssembler [Tru,Tru,Store "y", Fetch "x",Tru]
 -- You should get an exception with the string: "Run-time error"
+
+
+test1 :: Bool
+test1 = testAssembler [Push 10,Push 4,Push 3,Sub,Mult] == ("-10","")
+
+test2 :: Bool
+test2 = testAssembler [Fals,Push 3,Tru,Store "var",Store "a", Store "someVar"] == ("","a=3,someVar=False,var=True")
+
+test3 :: Bool
+test3 = testAssembler [Fals,Store "var",Fetch "var"] == ("False","var=False")
+
+test4 :: Bool
+test4 = testAssembler [Push (-20),Tru,Fals] == ("False,True,-20","")
+
+test5 :: Bool
+test5 = testAssembler [Push (-20),Tru,Tru,Neg] == ("False,True,-20","")
+
+test6 :: Bool
+test6 = testAssembler [Push (-20),Tru,Tru,Neg,Equ] == ("False,-20","")
+
+test7 :: Bool
+test7 = testAssembler [Push (-20),Push (-21), Le] == ("True","")
+
+test8 :: Bool
+test8 = testAssembler [Push 5,Store "x",Push 1,Fetch "x",Sub,Store "x"] == ("","x=4")
+
+test9 :: Bool
+test9 = testAssembler [Push 10,Store "i",Push 1,Store "fact",Loop [Push 1,Fetch "i",Equ,Neg] [Fetch "i",Fetch "fact",Mult,Store "fact",Push 1,Fetch "i",Sub,Store "i"]] == ("","fact=3628800,i=1")
+
+tests :: Bool
+tests = test1 && test2 && test3 && test4 && test5 && test6 && test7 && test8 && test9
 
 -- Part 2
 
