@@ -223,10 +223,9 @@ compile = undefined -- TODO
 parse = undefined -- TODO
 
 -- To help you test your parser
--- uncomment
---testParser :: String -> (String, String)
---testParser programCode = (stack2Str stack, store2Str store)
---  where (_,stack,store) = run(compile (parse programCode), createEmptyStack, createEmptyStore)
+testParser :: String -> (String, String)
+testParser programCode = (stack2Str stack, state2Str state)
+  where (_,stack,state) = run(compile (parse programCode), createEmptyStack, createEmptyState)
 
 -- Examples:
 -- testParser "x := 5; x := x - 1;" == ("","x=4")
