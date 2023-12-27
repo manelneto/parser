@@ -1,6 +1,6 @@
-import Data.Map (Map)
-import qualified Data.Map as Map
-import GHC.IO.Encoding.Failure (codingFailureModeSuffix)
+import Data.Map (Map, fromList, toList, (!), member, insert, empty, lookup)
+import Data.List (sort)
+
 -- PFL 2023/24 - Haskell practical assignment quickstart
 -- Updated on 27/12/2023
 
@@ -68,14 +68,14 @@ createEmptyState = State []
 
 state2Str :: State -> String  -- TODO: Sorting
 state2Str (State []) = ""
-state2Str (State (h:t))
-  | null t = case h of
+state2Str (State l)
+  | null t = case h of 
       (x, Left y) -> x ++ "=" ++ show y ++ state2Str (State t)
       (x, Right y) -> x ++ "=" ++ show y ++ state2Str (State t)
   | otherwise = case h of
       (x, Left y) -> x ++ "=" ++ show y ++ "," ++ state2Str (State t)
       (x, Right y) -> x ++ "=" ++ show y ++ "," ++ state2Str (State t)
-
+  where (h:t) = sort l
 
 run :: (Code, Stack, State) -> (Code, Stack, State)
 run ([], stack, state) = ([], stack, state)
@@ -93,6 +93,8 @@ run ((h:t), stack, state) = case h of
   Branch c1 c2 -> run (c ++ t, s, state) where (c, s) = branch c1 c2 stack  
   Noop -> run (t, stack, state)
   Loop c1 c2 -> run(c ++ t, stack, state) where c = loop c1 c2
+  Neg -> run (t, neg stack, state)
+  And -> run (t, myAnd stack, state)
 
 
 add :: Stack -> Stack
@@ -153,7 +155,9 @@ fetch x (Stack s) (State ((y, v):t))
 store :: String -> Stack -> State -> (Stack, State)
 store x (Stack []) (State s) = error "Run-time error"
 store x (Stack (h:t)) (State s) = 
-  (Stack t, State ((x, h):s))
+    (Stack t, State (toList (insert x h (fromList s))))
+
+  
 
 branch :: Code -> Code -> Stack -> (Code, Stack)
 branch c1 c2 (Stack []) = error "Run-time error"
@@ -165,8 +169,18 @@ branch c1 c2 (Stack (h:t)) = case h of
 loop :: Code -> Code -> Code
 loop c1 c2 = c1 ++ [Branch (c2 ++ [Loop c1 c2]) [Noop]]
 
+neg :: Stack -> Stack                   -- Ver caso Inteiro ????
+neg (Stack []) = error "Run-time error"
+neg (Stack (h:t)) = case h of
+  Right x -> Stack (Right (not x):t)
+  _ -> error "Run-time error"
 
-
+myAnd :: Stack -> Stack
+myAnd (Stack []) = error "Run-time error"
+myAnd (Stack [x]) = error "Run-time error"
+myAnd (Stack (x:y:t)) = case (x, y) of
+  (Right x, Right y) -> Stack (Right (x && y):t)
+  _ -> error "Run-time error"
 
 
 -- To help you test your assembler
@@ -176,15 +190,15 @@ testAssembler code = (stack2Str stack, state2Str state)
 
 --
 -- Examples:
--- testAssembler [Push 10,Push 4,Push 3,Sub,Mult] == ("-10","")
--- testAssembler [Fals,Push 3,Tru,Store "var",Store "a", Store "someVar"] == ("","a=3,someVar=False,var=True")
--- testAssembler [Fals,Store "var",Fetch "var"] == ("False","var=False")
--- testAssembler [Push (-20),Tru,Fals] == ("False,True,-20","")
--- testAssembler [Push (-20),Tru,Tru,Neg] == ("False,True,-20","")
--- testAssembler [Push (-20),Tru,Tru,Neg,Equ] == ("False,-20","")
--- testAssembler [Push (-20),Push (-21), Le] == ("True","")
--- testAssembler [Push 5,Store "x",Push 1,Fetch "x",Sub,Store "x"] == ("","x=4")
--- testAssembler [Push 10,Store "i",Push 1,Store "fact",Loop [Push 1,Fetch "i",Equ,Neg] [Fetch "i",Fetch "fact",Mult,Store "fact",Push 1,Fetch "i",Sub,Store "i"]] == ("","fact=3628800,i=1")
+-- certo testAssembler [Push 10,Push 4,Push 3,Sub,Mult] == ("-10","")
+-- certo testAssembler [Fals,Push 3,Tru,Store "var",Store "a", Store "someVar"] == ("","a=3,someVar=False,var=True")
+-- certo testAssembler [Fals,Store "var",Fetch "var"] == ("False","var=False")
+-- certo testAssembler [Push (-20),Tru,Fals] == ("False,True,-20","")
+-- certo testAssembler [Push (-20),Tru,Tru,Neg] == ("False,True,-20","")
+-- certo testAssembler [Push (-20),Tru,Tru,Neg,Equ] == ("False,-20","")
+-- certo testAssembler [Push (-20),Push (-21), Le] == ("True","")
+-- certo testAssembler [Push 5,Store "x",Push 1,Fetch "x",Sub,Store "x"] == ("","x=4")
+-- certo testAssembler [Push 10,Store "i",Push 1,Store "fact",Loop [Push 1,Fetch "i",Equ,Neg] [Fetch "i",Fetch "fact",Mult,Store "fact",Push 1,Fetch "i",Sub,Store "i"]] == ("","fact=3628800,i=1")
 -- If you test:
 -- testAssembler [Push 1,Push 2,And]
 -- You should get an exception with the string: "Run-time error"
