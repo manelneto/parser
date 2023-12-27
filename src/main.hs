@@ -19,14 +19,9 @@ type Code = [Inst]
 type Stack = [Either Integer Bool]
 
 -- Storage is a list of variables and their values in the form (VarName, Value)
-data State = State (Map String (Either Integer Bool))
+type State = Map String (Either Integer Bool)
 
-myPush:: Either Integer Bool -> Stack -> Stack
-myPush x s = x:s
 
---  |||||||||||||||||||||||||||||||||||
---                  Stack
---  |||||||||||||||||||||||||||||||||||
 
 -- createEmptyStack :: Stack
 -- Function that returns an empty Stack
@@ -51,10 +46,10 @@ stack2Str (h:t)
 --  |||||||||||||||||||||||||||||||||||
 
 createEmptyState :: State 
-createEmptyState = State empty
+createEmptyState = empty
 
 state2Str :: State -> String
-state2Str (State m) = case toList m of
+state2Str state = case toList state of
   [] -> ""
   lst -> intercalate "," $ map (\(x, y) -> x ++ "=" ++ showValue y) lst  where
     showValue :: Either Integer Bool -> String
@@ -72,7 +67,7 @@ run (h:t, stack, state) = case h of
   Push n -> run (t, push n stack, state)
   Tru -> run (t, true stack, state)
   Fals -> run (t, false stack, state)
-  Fetch x -> run (t, (fetch x stack state), state)
+  Fetch x -> run (t, fetch x stack state, state)
   Store x -> run (t, fst stackState, snd stackState) where  stackState = store x stack state
   Branch c1 c2 -> run (c ++ t, s, state) where (c, s) = branch c1 c2 stack  
   Noop -> run (t, stack, state)
@@ -128,16 +123,16 @@ false :: Stack -> Stack
 false s = Right False:s
 
 fetch :: String -> Stack -> State -> Stack
-fetch x s (State m) = case Data.Map.lookup x m of
+fetch x s state = case Data.Map.lookup x state of
   Just val -> case val of
     Left intVal -> Left intVal : s
     Right boolVal -> Right boolVal : s
   Nothing -> error "Run-time error"
 
 store :: String -> Stack -> State -> (Stack, State)
-store x [] (State s) = error "Run-time error"
-store x (h:t) (State s) = 
-    (t, State (insert x h s))
+store x [] state = error "Run-time error"
+store x (h:t) state = 
+    (t, insert x h state)
 
 
 branch :: Code -> Code -> Stack -> (Code, Stack)
