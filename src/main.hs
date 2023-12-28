@@ -33,7 +33,7 @@ stack2Str (h:t)
       Right x -> show x ++ stack2Str t
   | otherwise = case h of
       Left x -> show x ++ "," ++ stack2Str t
-      Right x -> show x ++ "," ++ stack2Str t
+      Right x -> show x ++ "," ++ stack2Str t 
   
 -- Returns the string representation of a state in the form "x=1,y=False,z=2", 
 -- where x, y and z are the variables in the state, ordered alphabetically
@@ -253,17 +253,38 @@ tests = test1 && test2 && test3 && test4 && test5 && test6 && test7 && test8 && 
 
 -- TODO: Define the types Aexp, Bexp, Stm and Program
 
--- compA :: Aexp -> Code
-compA = undefined -- TODO
+data Aexp = FetchA String | PushA Integer | AddA Aexp Aexp | SubA Aexp Aexp | MultA Aexp Aexp deriving Show
+data Bexp = TruB | FalsB | EqB Aexp Aexp | LeB Aexp Aexp | NegB Bexp | AndB Bexp Bexp deriving Show
+data Stm = If Bexp Stm Stm | While Bexp Stm | StoreS String Aexp | SeqS Stm Stm deriving Show
+type Program = [Stm]
 
--- compB :: Bexp -> Code
-compB = undefined -- TODO
+compA :: Aexp -> Code
+compA exprA = case exprA of
+  FetchA x -> [Fetch x]
+  PushA n -> [Push n]
+  AddA a1 a2 -> compA a2 ++ compA a1 ++ [Add]
+  SubA a1 a2 -> compA a2 ++ compA a1 ++ [Sub]
+  MultA a1 a2 -> compA a2 ++ compA a1 ++ [Mult]
 
--- compile :: Program -> Code
-compile = undefined -- TODO
+compB :: Bexp -> Code
+compB exprB = case exprB of
+  TruB -> [Tru]
+  FalsB -> [Fals]
+  EqB a1 a2 -> compA a2 ++ compA a1 ++ [Equ]
+  LeB a1 a2 -> compA a2 ++ compA a1 ++ [Le]
+  NegB b -> compB b ++ [Neg]
+  AndB b1 b2 -> compB b2 ++ compB b1 ++ [And]
 
--- parse :: String -> Program
-parse = undefined -- TODO
+compile :: Program -> Code
+compile [] = []
+compile (h:t) = case h of
+  StoreS name value -> compA value ++ [Store name] ++ compile t
+  SeqS stm1 stm2 -> compile [stm1] ++ compile [stm2] ++ compile t -- TODO
+  If bexp stm1 stm2 -> compB bexp ++ [Branch (compile [stm1]) (compile [stm2])] ++ compile t
+  While bexp stm -> [Loop (compB bexp) (compile [stm])] ++ compile t
+
+--parse :: String -> Program
+parse = undefined
 
 -- To help you test your parser
 testParser :: String -> (String, String)
@@ -283,3 +304,83 @@ testParser programCode = (stack2Str stack, state2Str state)
 -- testParser "if (1 == 0+1 = (2+1 == 4)) then x := 1; else x := 2;" == ("","x=2")
 -- testParser "x := 2; y := (x - 3)*(4 + 2*3); z := x +x*(2);" == ("","x=2,y=-10,z=6")
 -- testParser "i := 10; fact := 1; while (not(i == 1)) do (fact := fact * i; i := i - 1;);" == ("","fact=3628800,i=1")
+
+{-
+test1 :: Bool
+test1 = testParser "x := 5; x := x - 1;" == ("","x=4")
+
+test2 :: Bool
+test2 = testParser "x := 0 - 2;" == ("","x=-2")
+
+test3 :: Bool
+test3 = testParser "if (not True and 2 <= 5 = 3 == 4) then x :=1; else y := 2;" == ("","y=2")
+
+test4 :: Bool
+test4 = testParser "x := 42; if x <= 43 then x := 1; else (x := 33; x := x+1;);" == ("","x=1")
+
+test5 :: Bool
+test5 = testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1;" == ("","x=2")
+
+test6 :: Bool
+test6 = testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1; z := x+x;" == ("","x=2,z=4")
+
+test7 :: Bool
+test7 = testParser "x := 44; if x <= 43 then x := 1; else (x := 33; x := x+1;); y := x*2;" == ("","x=34,y=68")
+
+test8 :: Bool
+test8 = testParser "x := 42; if x <= 43 then (x := 33; x := x+1;) else x := 1;" == ("","x=34")
+
+test9 :: Bool
+test9 = testParser "if (1 == 0+1 = 2+1 == 3) then x := 1; else x := 2;" == ("","x=1")
+
+test10 :: Bool
+test10 = testParser "if (1 == 0+1 = (2+1 == 4)) then x := 1; else x := 2;" == ("","x=2")
+
+test11 :: Bool
+test11 = testParser "x := 2; y := (x - 3)*(4 + 2*3); z := x +x*(2);" == ("","x=2,y=-10,z=6")
+
+test12 :: Bool
+test12 = testParser "i := 10; fact := 1; while (not(i == 1)) do (fact := fact * i; i := i - 1;);" == ("","fact=3628800,i=1")
+
+tests :: Bool
+tests = test1 && test2 && test3 && test4 && test5 && test6 && test7 && test8 && test9 && test10 && test11 && test12
+-}
+
+-- Exemplo de programa simples: x := 10;
+program1 :: Program
+program1 = [StoreS "x" (PushA 10)]
+
+-- Exemplo de sequência de comandos: x := 5; y := x + 3;
+program2 :: Program
+program2 = [StoreS "x" (PushA 5), StoreS "y" (AddA (PushA 2) (PushA 3))]
+
+-- Exemplo de condicional: if x = 0 then y := 1 else y := 2;
+program3 :: Program
+program3 = [If (EqB (FetchA "x") (PushA 0)) (StoreS "y" (PushA 1)) (StoreS "y" (PushA 2))]
+
+-- Exemplo de while loop: while x > 0 do x := x - 1;
+program4 :: Program
+program4 = [While (EqB (FetchA "x") (PushA 0)) (StoreS "x" (SubA (PushA 8) (PushA 1)))]
+
+program5 :: Program
+program5 = [While (EqB (FetchA "x") (PushA 0)) (StoreS "x" (SubA (FetchA "x") (PushA 1)))]
+
+
+-- Teste do compilador com os programas
+testCompile :: IO ()
+testCompile = do
+  putStrLn "Programa 1:"
+  print $ compile program1
+  
+  putStrLn "\nPrograma 2:"
+  print $ compile program2
+  
+  putStrLn "\nPrograma 3:"
+  print $ compile program3
+  
+  putStrLn "\nPrograma 4:"
+  print $ compile program4
+
+  putStrLn "\nPrograma 5:"
+  print $ compile program5
+
