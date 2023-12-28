@@ -253,35 +253,43 @@ tests = test1 && test2 && test3 && test4 && test5 && test6 && test7 && test8 && 
 
 -- TODO: Define the types Aexp, Bexp, Stm and Program
 
-data Aexp = FetchA String | PushA Integer | AddA Aexp Aexp | SubA Aexp Aexp | MultA Aexp Aexp deriving Show
-data Bexp = TruB | FalsB | EqB Aexp Aexp | LeB Aexp Aexp | NegB Bexp | AndB Bexp Bexp deriving Show
-data Stm = If Bexp Stm Stm | While Bexp Stm | StoreS String Aexp | SeqS Stm Stm deriving Show
+-- ! TODO: quero eliminar a necessidade destes IntVal/IntVar e BoolVal/BoolVar - idealmente o construtor não precisava disto e era diretamente o inteiro ou a string mas eu não consigo fazer isso
+-- Ou seja, quero passar de [IntAssign "x" (IntVal 10)] para [IntAssign "x" 10]
+
+-- ! TODO: eventualmente livrar-me também do IntAssign/BoolAssign para apenas Assign
+-- Ou seja, ainda passar de [IntAssign "x" 10] para [Assign "x" 10] 
+
+data Aexp = IntVal Integer | IntVar String | AddA Aexp Aexp | SubA Aexp Aexp | MultA Aexp Aexp deriving Show
+data Bexp = BoolVal Bool | BoolVar String | EqB Aexp Aexp | LeB Aexp Aexp | CmpB Bexp Bexp | AndB Bexp Bexp | NegB Bexp deriving Show
+data Stm = IntAssign String Aexp | BoolAssign String Bexp | If Bexp Stm Stm | While Bexp Stm | Seq Stm Stm
 type Program = [Stm]
 
 compA :: Aexp -> Code
-compA exprA = case exprA of
-  FetchA x -> [Fetch x]
-  PushA n -> [Push n]
-  AddA n1 n2 -> compA n1 ++ compA n2 ++ [Add]
-  SubA n1 n2 -> compA n1 ++ compA n2 ++ [Sub]
-  MultA n1 n2 -> compA n1 ++ compA n2 ++ [Mult]
+compA expA = case expA of
+  IntVal val -> [Push val]
+  IntVar var -> [Fetch var]
+  AddA left right -> compA right ++ compA left ++ [Add]
+  SubA left right -> compA right ++ compA left ++ [Sub]
+  MultA left right -> compA right ++ compA left ++ [Mult]
 
 compB :: Bexp -> Code
-compB exprB = case exprB of
-  TruB -> [Tru]
-  FalsB -> [Fals]
-  EqB n1 n2 -> compA n1 ++ compA n2 ++ [Equ]
-  LeB n1 n2 -> compA n1 ++ compA n2 ++ [Le]
-  NegB b -> compB b ++ [Neg]
-  AndB b1 b2 -> compB b1 ++ compB b2 ++ [And]
+compB expB = case expB of
+  BoolVal val -> if val then [Tru] else [Fals]
+  BoolVar var -> [Fetch var]
+  EqB left right -> compA right ++ compA left ++ [Equ]
+  LeB left right -> compA right ++ compA left ++ [Le]
+  CmpB left right -> compB right ++ compB left ++ [Equ]
+  AndB left right -> compB right ++ compB left ++ [And]
+  NegB op -> compB op ++ [Neg]
 
 compile :: Program -> Code
 compile [] = []
 compile (h:t) = case h of
-  StoreS x n -> compA n ++ [Store x] ++ compile t
-  SeqS s1 s2 -> compile [s1] ++ compile [s2] ++ compile t -- TODO
+  IntAssign var expA -> compA expA ++ [Store var] ++ compile t
+  BoolAssign var expB -> compB expB ++ [Store var] ++ compile t
+  Seq s1 s2 -> compile [s1] ++ compile [s2] ++ compile t
   If bexp s1 s2 -> compB bexp ++ [Branch (compile [s1]) (compile [s2])] ++ compile t
-  While bexp s -> [Loop (compB bexp) (compile [s])] ++ compile t
+  While expB s -> Loop (compB expB) (compile [s]) : compile t
 
 --parse :: String -> Program
 parse = undefined
@@ -348,27 +356,44 @@ tests = test1 && test2 && test3 && test4 && test5 && test6 && test7 && test8 && 
 
 -- Exemplo de programa simples: x := 10;
 program1 :: Program
-program1 = [StoreS "x" (PushA 10)]
+-- program1 = [Assign "x" (PushA 10)]
+program1 = [IntAssign "x" (IntVal 10)]
 
 -- Exemplo de sequência de comandos: x := 5; y := x + 3;
 program2 :: Program
-program2 = [StoreS "x" (PushA 5), StoreS "y" (AddA (PushA 2) (PushA 3))]
+-- program2 = [StoreS "x" (PushA 5), StoreS "y" (AddA (PushA 2) (PushA 3))]
+program2 = [IntAssign "x" (IntVal 5), IntAssign "y" (AddA (IntVar "x") (IntVal 3))]
 
 -- Exemplo de condicional: if x = 0 then y := 1 else y := 2;
-program3 :: Program
-program3 = [If (EqB (FetchA "x") (PushA 0)) (StoreS "y" (PushA 1)) (StoreS "y" (PushA 2))]
+-- program3 :: Program
+-- program3 = [If (EqB (FetchA "x") (PushA 0)) (StoreS "y" (PushA 1)) (StoreS "y" (PushA 2))]
 
 -- Exemplo de while loop: while x > 0 do x := x - 1;
-program4 :: Program
-program4 = [While (EqB (FetchA "x") (PushA 0)) (StoreS "x" (SubA (PushA 8) (PushA 1)))]
+-- program4 :: Program
+-- program4 = [While (EqB (FetchA "x") (PushA 0)) (StoreS "x" (SubA (PushA 8) (PushA 1)))]
 
-program5 :: Program
-program5 = [While (EqB (FetchA "x") (PushA 0)) (StoreS "x" (SubA (FetchA "x") (PushA 1)))]
+-- program5 :: Program
+-- program5 = [While (EqB (FetchA "x") (PushA 0)) (StoreS "x" (SubA (FetchA "x") (PushA 1)))]
 
+-- x = 1
+assign :: Program
+assign = [IntAssign "x" (IntVal 1)]
+
+-- x = 1; y = x + 2
+addition :: Program
+addition = [IntAssign "x" (IntVal 1), IntAssign "y" (AddA (IntVar "x") (IntVal 2))]
+
+-- x = true; y = not x
+negation :: Program
+negation = [BoolAssign "x" (BoolVal True), BoolAssign "y" (NegB (BoolVar "x"))]
+
+-- if (true) x = true else y = false
+conditional :: Program
+conditional = [If (BoolVal True) (BoolAssign "x" (BoolVal True)) (BoolAssign "y" (BoolVal False))]
 
 -- Teste do compilador com os programas
-testCompile :: IO ()
-testCompile = do
+testCompiler :: IO ()
+testCompiler = do
   putStrLn "Programa 1:"
   print $ compile program1
   
@@ -376,11 +401,22 @@ testCompile = do
   print $ compile program2
   
   putStrLn "\nPrograma 3:"
-  print $ compile program3
+  print $ "TODO" -- compile program3
   
   putStrLn "\nPrograma 4:"
-  print $ compile program4
+  print $ "TODO" -- compile program4
 
   putStrLn "\nPrograma 5:"
-  print $ compile program5
+  print $ "TODO" -- compile program5
 
+  putStrLn "\nAssign:"
+  print $ compile assign
+  
+  putStrLn "\nAddition:"
+  print $ compile addition
+
+  putStrLn "\nNegation:"
+  print $ compile negation
+  
+  putStrLn "\nConditional:"
+  print $ compile conditional
