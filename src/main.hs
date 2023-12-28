@@ -262,26 +262,26 @@ compA :: Aexp -> Code
 compA exprA = case exprA of
   FetchA x -> [Fetch x]
   PushA n -> [Push n]
-  AddA a1 a2 -> compA a2 ++ compA a1 ++ [Add]
-  SubA a1 a2 -> compA a2 ++ compA a1 ++ [Sub]
-  MultA a1 a2 -> compA a2 ++ compA a1 ++ [Mult]
+  AddA n1 n2 -> compA n1 ++ compA n2 ++ [Add]
+  SubA n1 n2 -> compA n1 ++ compA n2 ++ [Sub]
+  MultA n1 n2 -> compA n1 ++ compA n2 ++ [Mult]
 
 compB :: Bexp -> Code
 compB exprB = case exprB of
   TruB -> [Tru]
   FalsB -> [Fals]
-  EqB a1 a2 -> compA a2 ++ compA a1 ++ [Equ]
-  LeB a1 a2 -> compA a2 ++ compA a1 ++ [Le]
+  EqB n1 n2 -> compA n1 ++ compA n2 ++ [Equ]
+  LeB n1 n2 -> compA n1 ++ compA n2 ++ [Le]
   NegB b -> compB b ++ [Neg]
-  AndB b1 b2 -> compB b2 ++ compB b1 ++ [And]
+  AndB b1 b2 -> compB b1 ++ compB b2 ++ [And]
 
 compile :: Program -> Code
 compile [] = []
 compile (h:t) = case h of
-  StoreS name value -> compA value ++ [Store name] ++ compile t
-  SeqS stm1 stm2 -> compile [stm1] ++ compile [stm2] ++ compile t -- TODO
-  If bexp stm1 stm2 -> compB bexp ++ [Branch (compile [stm1]) (compile [stm2])] ++ compile t
-  While bexp stm -> [Loop (compB bexp) (compile [stm])] ++ compile t
+  StoreS x n -> compA n ++ [Store x] ++ compile t
+  SeqS s1 s2 -> compile [s1] ++ compile [s2] ++ compile t -- TODO
+  If bexp s1 s2 -> compB bexp ++ [Branch (compile [s1]) (compile [s2])] ++ compile t
+  While bexp s -> [Loop (compB bexp) (compile [s])] ++ compile t
 
 --parse :: String -> Program
 parse = undefined
