@@ -1,5 +1,6 @@
 import Data.Map (Map, fromList, toList, (!), member, insert, empty, lookup)
 import Data.List (sort, intercalate)
+import Data.Char (isAlpha, isAlphaNum, isUpper, isLower, isDigit)
 
 
 data Inst =
@@ -384,9 +385,9 @@ program4 = [While (NegB (LeA (NumVar "x") (Num 0))) (AssignA "x" (SubA (NumVar "
 correct4 :: Code
 correct4 = [Loop [Push 0, Fetch "x", Le, Neg] [Push 1, Fetch "x", Sub, Store "x"]]
 
--- ? Nao percebi qual era o codigo correspondente, por isso nao consegui traduzir para a nova linguagem
--- program5 :: Program
--- program5 = [While (EqB (FetchA "x") (PushA 0)) (StoreS "x" (SubA (FetchA "x") (PushA 1)))]
+-- Exemplo de while loop: while x != 0 do x := x - 1;
+program5 :: Program
+program5 = [AssignA "x" (Num 10),While (NegB (EqA (NumVar "x") (Num 0))) (AssignA "x" (SubA (NumVar "x") (Num 1)))]
 
 -- x = 1
 assignment :: Program
@@ -459,3 +460,43 @@ test9' = testCompiler factorial == code2Str factorial'
 
 tests' :: Bool
 tests' = test1' && test2' && test3' && test4' && test5' && test6' && test7' && test8' && test9'
+
+
+-- Auxiliar functions that splits the input string into a list of strings (tokens)
+-- Ignores words started by uppercase letters
+
+lexer :: String -> [String]
+lexer [] = []
+lexer (c:t) = case c of
+  ' ' -> lexer t
+  ';' -> ";" : lexer t
+  '(' -> "(" : lexer t
+  ')' -> ")" : lexer t
+  '+' -> "+" : lexer t
+  '-' -> "-" : lexer t
+  '*' -> "*" : lexer t
+  '<' | t /= [] && take 1 t == "=" -> "<=" : lexer (drop 1 t)
+      | otherwise -> "<" : lexer t
+  '>' | t /= [] && take 1 t == "=" -> ">=" : lexer (drop 1 t)
+      | otherwise -> ">" : lexer t
+  '=' | t /= [] && take 1 t == "=" -> "==" : lexer (drop 1 t)
+      | otherwise -> "=" : lexer t
+  ':' | t /= [] && take 1 t == "=" -> ":=" : lexer (drop 1 t)
+  'n' | t /= [] && take 2 t == "ot" -> "not" : lexer (drop 2 t)
+  'T' | t /= [] && take  3 t == "rue" -> "true" : lexer (drop 3 t)
+  'F' | t /= [] && take 4 t == "alse" -> "false" : lexer (drop 4 t)
+  'i' | t /= [] && take 1 t == "f" -> "if" : lexer (drop 1 t)
+  't' | t /= [] && take 3 t == "hen" -> "then" : lexer (drop 3 t)
+  'e' | t /= [] && take 3 t == "lse" -> "else" : lexer (drop 3 t)
+  'w' | t /= [] && take 4 t == "hile" -> "while" : lexer (drop 4 t)
+  'd' | t /= [] && take 2 t == "do" -> "do" : lexer (drop 2 t)
+  _   | isAlpha c && isLower c -> let (var, rest) = span isAlphaNum (c:t) in var : lexer rest
+--      | isAlpha c && isUpper c -> let (var, rest) = span isAlphaNum (c:t) in lexer rest
+      | isDigit c -> let (num, rest) = span isDigit (c:t) in num : lexer rest
+      | otherwise -> lexer t
+
+-- Exemplos de programas
+-- lexer "x := 5; x := x - 1;"
+-- lexer "x := 0 - 2;"
+-- lexer "if (not True and 2 <= 5 = 3 == 4) then x :=1; else y := 2;"
+-- lexer "x:=23 + variable * 421;while(x !=2)"
