@@ -1,7 +1,9 @@
 import Data.Map (Map, fromList, toList, (!), member, insert, empty, lookup)
 import Data.List (sort, intercalate)
 import Data.Char (isAlpha, isAlphaNum, isUpper, isLower, isDigit, digitToInt)
+import Debug.Trace (trace)
 
+debug = flip trace
 
 data Inst =
   Push Integer | Add | Mult | Sub | Tru | Fals | Equ | Le | And | Neg | Fetch String | Store String | Noop |
@@ -253,13 +255,13 @@ tests = test1 && test2 && test3 && test4 && test5 && test6 && test7 && test8 && 
 
 
 -- Aexp is an arithmetic expression
-data Aexp = Num Integer | NumVar String | AddA Aexp Aexp | SubA Aexp Aexp | MultA Aexp Aexp
+data Aexp = Num Integer | NumVar String | AddA Aexp Aexp | SubA Aexp Aexp | MultA Aexp Aexp deriving Show
 
 -- Bexp is a boolean expression
-data Bexp = Bool Bool | BoolVar String | EqA Aexp Aexp | LeA Aexp Aexp | EqB Bexp Bexp | AndB Bexp Bexp | NegB Bexp
+data Bexp = Bool Bool | BoolVar String | EqA Aexp Aexp | LeA Aexp Aexp | EqB Bexp Bexp | AndB Bexp Bexp | NegB Bexp deriving Show
 
 -- Stm is a statement
-data Stm = AssignA String Aexp | AssignB String Bexp | If Bexp Stm Stm | While Bexp Stm | Seq Stm Stm
+data Stm = AssignA String Aexp | AssignB String Bexp | If Bexp Stm Stm | While Bexp Stm | Seq Stm Stm deriving Show
 
 -- Program is a list of statements
 type Program = [Stm]
@@ -302,10 +304,58 @@ compile (h:t) = case h of
 parse = undefined
 
 
---parseInt :: [String] -> Maybe (Aexp, [String])
+parseAexp :: [Token] -> Maybe (Aexp, [Token])
+parseAexp tokens = case parseAddA tokens of
+      Just (addA, restTokens) -> Just (addA, restTokens) `debug` "Hello"
+      Nothing -> case parseSubA tokens of
+        Just (subA, restTokens) -> Just (subA, restTokens)
+        Nothing -> case parseMultA tokens of
+          Just (multA, restTokens) -> Just (multA, restTokens)
+          Nothing -> case parseInt tokens of
+            Just (num, restTokens) -> Just (num, restTokens) `debug` "Hello"
+            Nothing -> case parseVar tokens of
+              Just (var, restTokens) -> Just (var, restTokens) 
+              Nothing -> Nothing
+
+parseAddA :: [Token] -> Maybe (Aexp, [Token])
+parseAddA tokens = case parseAexp tokens of
+  Just (left, PlusTok : restTokens) -> case parseAexp restTokens of
+    Just (right, restTokens) -> Just (AddA left right, restTokens) 
+    Nothing -> Nothing
+  _ -> Nothing
 
 
---["x",":=","5",";","x",":=","x","-","1",";"]
+parseSubA :: [Token] -> Maybe (Aexp, [Token])
+parseSubA tokens = case parseAexp tokens of
+  Just (left, MinusTok : restTokens) -> case parseAexp restTokens of
+    Just (right, restTokens) -> Just (SubA left right, restTokens)
+    Nothing -> Nothing
+  _ -> Nothing
+
+parseMultA :: [Token] -> Maybe (Aexp, [Token])
+parseMultA tokens = case parseAexp tokens of
+  Just (left, MultTok : restTokens) -> case parseAexp restTokens of
+    Just (right, restTokens) -> Just (MultA left right, restTokens)
+    Nothing -> Nothing
+  _ -> Nothing
+
+parseAssign :: [Token] -> Maybe (Stm, [Token])
+parseAssign (VarTok varName : AssignTok : restTokens) = case parseAexp restTokens of
+  Just (varValue, restTokens) -> Just (AssignA varName varValue, restTokens)
+
+
+parseInt :: [Token] -> Maybe (Aexp, [Token])
+parseInt (NumTok n : restTokens) = Just (Num n, restTokens)
+parseInt tokens = Nothing
+
+
+parseVar :: [Token] -> Maybe (Aexp, [Token]) -- TODO - parseVar para booleanos (GL)
+parseVar (VarTok var : restTokens) = Just (NumVar var, restTokens)
+parseVar tokens = Nothing
+
+
+-- "x:=1"
+--["x",":=","x","-","1",";"]
 --[AssignA "x" (Num 5), AssignA "x" (SubA (NumVar "x") (Num 1))]
 --["if","(","not","true","and","2","<=","5","=","3","==","4",")","then","x",":=","1",";","else","y",":=","2",";"]
 
