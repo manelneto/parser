@@ -299,49 +299,66 @@ compile (h:t) = case h of
   If expB s1 s2 -> compB expB ++ [Branch (compile [s1]) (compile [s2])] ++ compile t
   While expB s -> Loop (compB expB) (compile [s]) : compile t
 
+-- uses the parseAux function to get the program
+parse :: String -> Program
+parse input = case parseAux (lexer input) of
+  Just (program, []) -> program
+  Nothing -> []
 
---parse :: String -> Program
-parse = undefined
+parseAux :: [Token] -> Maybe (Program, [Token])
+parseAux [] = Just ([], [])
+parseAux tokens = case parseStm tokens of
+  Just (stm, restTokens) -> case parseAux restTokens of
+    Just (program, restTokens) -> Just (stm : program, restTokens)
+    Nothing -> Nothing
+  Nothing -> Nothing
+
+parseStm :: [Token] -> Maybe (Stm, [Token])
+parseStm tokens = case parseAssign tokens of
+  Just (assign, restTokens) -> Just (assign, restTokens)
+  Nothing -> Nothing
+
+parseAssign :: [Token] -> Maybe (Stm, [Token])
+parseAssign (VarTok varName : AssignTok : restTokens) = case parseAexp restTokens of
+  Just (varValue, restTokens) -> Just (AssignA varName varValue, restTokens)
+  Nothing -> Nothing
+parseAssign _ = Nothing
 
 
 parseAexp :: [Token] -> Maybe (Aexp, [Token])
-parseAexp tokens = case parseAddA tokens of
+parseAexp tokens = case parseInt tokens of
+  Just (num, restTokens) -> Just (num, restTokens) `debug` "Hello"
+  Nothing -> case parseVar tokens of
+    Just (var, restTokens) -> Just (var, restTokens) 
+    Nothing -> case parseAddA tokens of
       Just (addA, restTokens) -> Just (addA, restTokens) `debug` "Hello"
       Nothing -> case parseSubA tokens of
         Just (subA, restTokens) -> Just (subA, restTokens)
         Nothing -> case parseMultA tokens of
           Just (multA, restTokens) -> Just (multA, restTokens)
-          Nothing -> case parseInt tokens of
-            Just (num, restTokens) -> Just (num, restTokens) `debug` "Hello"
-            Nothing -> case parseVar tokens of
-              Just (var, restTokens) -> Just (var, restTokens) 
-              Nothing -> Nothing
+          Nothing -> Nothing
 
 parseAddA :: [Token] -> Maybe (Aexp, [Token])
 parseAddA tokens = case parseAexp tokens of
   Just (left, PlusTok : restTokens) -> case parseAexp restTokens of
     Just (right, restTokens) -> Just (AddA left right, restTokens) 
     Nothing -> Nothing
-  _ -> Nothing
-
+  Nothing -> Nothing
 
 parseSubA :: [Token] -> Maybe (Aexp, [Token])
 parseSubA tokens = case parseAexp tokens of
   Just (left, MinusTok : restTokens) -> case parseAexp restTokens of
     Just (right, restTokens) -> Just (SubA left right, restTokens)
     Nothing -> Nothing
-  _ -> Nothing
+  Nothing -> Nothing
 
 parseMultA :: [Token] -> Maybe (Aexp, [Token])
 parseMultA tokens = case parseAexp tokens of
   Just (left, MultTok : restTokens) -> case parseAexp restTokens of
     Just (right, restTokens) -> Just (MultA left right, restTokens)
     Nothing -> Nothing
-  _ -> Nothing
+  Nothing -> Nothing
 
-parseAssign :: [Token] -> Maybe (Stm, [Token])
-parseAssign (VarTok varName : AssignTok : restTokens) = case parseAexp restTokens of
-  Just (varValue, restTokens) -> Just (AssignA varName varValue, restTokens)
 
 
 parseInt :: [Token] -> Maybe (Aexp, [Token])
