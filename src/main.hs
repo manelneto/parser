@@ -16,11 +16,11 @@ type Stack = [Either Integer Bool]
 type State = Map String (Either Integer Bool)
 
 
--- returns an empty Stack
+-- Returns an empty Stack
 createEmptyStack :: Stack 
 createEmptyStack = []
 
--- returns an empty State 
+-- Returns an empty State 
 createEmptyState :: State 
 createEmptyState = empty
 
@@ -37,7 +37,6 @@ stack2Str (h:t)
   
 -- Returns the string representation of a state in the form "x=1,y=False,z=2", 
 -- where x, y and z are the variables in the state, ordered alphabetically
-
 state2Str :: State -> String
 state2Str state = case toList state of
   [] -> ""
@@ -48,7 +47,6 @@ state2Str state = case toList state of
 
 -- Runs a list of instructions, returning as output an empty code list,
 -- a stack and the output values in the storage
-
 run :: (Code, Stack, State) -> (Code, Stack, State)
 run ([], stack, state) = ([], stack, state)
 run (h:t, stack, state) = case h of
@@ -72,8 +70,8 @@ run (h:t, stack, state) = case h of
 -- Instructions
 
 
--- Add the top two integer values of the stack, respectively, 
--- and push the result onto the top of the stack
+-- Adds the top two integer values of the stack, respectively, 
+-- and pushes the result onto the top of the stack
 add :: Stack -> Stack
 add [] = error "Run-time error"
 add [x] = error "Run-time error"
@@ -82,8 +80,8 @@ add (x:y:t) = case (x, y) of
   _ -> error "Run-time error"
 
 
--- Multiply the top two integer values of the stack, respectively,
--- and push the result onto the top of the stack
+-- Multiplies the top two integer values of the stack, respectively,
+-- and pushes the result onto the top of the stack
 mult :: Stack -> Stack
 mult [] = error "Run-time error"
 mult [x] = error "Run-time error"
@@ -92,8 +90,8 @@ mult (x:y:t) = case (x, y) of
   _ -> error "Run-time error"
 
 
--- Subtract the subtracts the topmost element of the stack with the second topmost element,
--- and push the result onto the top of the stack
+-- Subtracts the topmost element of the stack with the second topmost element,
+-- and pushes the result onto the top of the stack
 sub :: Stack -> Stack
 sub [] = error "Run-time error"
 sub [x] = error "Run-time error"
@@ -102,8 +100,8 @@ sub (x:y:t) = case (x, y) of
   _ -> error "Run-time error"
 
 
--- Compare the top two values of the stack for equality,
--- and push a boolean with the comparison result onto the top of the stack
+-- Compares the top two values of the stack for equality,
+-- and pushes a boolean with the comparison result onto the top of the stack
 eq :: Stack -> Stack
 eq [] = error "Run-time error"
 eq [x] = error "Run-time error"
@@ -114,7 +112,7 @@ eq (x:y:t) = case (x, y) of
 
 
 -- Determines whether the topmost stack element is less or equal to the second topmost element,
--- and push a boolean with the comparison result onto the top of the stack
+-- and pushes a boolean with the comparison result onto the top of the stack
 le :: Stack -> Stack
 le [] = error "Run-time error"
 le [x] = error "Run-time error"
@@ -138,7 +136,7 @@ false :: Stack -> Stack
 false s = Right False:s
 
 
--- Pushes the value bound to x onto the stack.
+-- Pushes the value bound to x onto the top of the stack.
 -- If x is not bound, raises a run-time error
 fetch :: String -> Stack -> State -> Stack
 fetch x s state = case Data.Map.lookup x state of
@@ -177,7 +175,7 @@ loop c1 c2 = c1 ++ [Branch (c2 ++ [Loop c1 c2]) [Noop]]
 
 -- Negates the topmost boolean value of the stack,
 -- and pushes the result onto the top of the stack
-neg :: Stack -> Stack                   -- Ver caso Inteiro ????
+neg :: Stack -> Stack
 neg [] = error "Run-time error"
 neg (h:t) = case h of
   Right x -> Right (not x):t
@@ -185,7 +183,7 @@ neg (h:t) = case h of
 
 
 -- Pops the two top values of the stack,
--- and pushes the result of the logical operation AND between them if they are both booleans.
+-- and pushes the result of the logical operation AND between them if they are both booleans
 myAnd :: Stack -> Stack
 myAnd [] = error "Run-time error"
 myAnd [x] = error "Run-time error"
@@ -249,39 +247,55 @@ test9 = testAssembler [Push 10,Store "i",Push 1,Store "fact",Loop [Push 1,Fetch 
 tests :: Bool
 tests = test1 && test2 && test3 && test4 && test5 && test6 && test7 && test8 && test9
 
+
 -- Part 2
 
--- TODO: Define the types Aexp, Bexp, Stm and Program
 
-data Aexp = FetchA String | PushA Integer | AddA Aexp Aexp | SubA Aexp Aexp | MultA Aexp Aexp deriving Show
-data Bexp = TruB | FalsB | EqB Aexp Aexp | LeB Aexp Aexp | NegB Bexp | AndB Bexp Bexp deriving Show
-data Stm = If Bexp Stm Stm | While Bexp Stm | StoreS String Aexp | SeqS Stm Stm deriving Show
+-- Aexp is an arithmetic expression
+data Aexp = Num Integer | NumVar String | AddA Aexp Aexp | SubA Aexp Aexp | MultA Aexp Aexp
+
+-- Bexp is a boolean expression
+data Bexp = Bool Bool | BoolVar String | EqA Aexp Aexp | LeA Aexp Aexp | EqB Bexp Bexp | AndB Bexp Bexp | NegB Bexp
+
+-- Stm is a statement
+data Stm = AssignA String Aexp | AssignB String Bexp | If Bexp Stm Stm | While Bexp Stm | Seq Stm Stm
+
+-- Program is a list of statements
 type Program = [Stm]
 
+
+-- Compiles an arithmetic expression
 compA :: Aexp -> Code
-compA exprA = case exprA of
-  FetchA x -> [Fetch x]
-  PushA n -> [Push n]
-  AddA n1 n2 -> compA n1 ++ compA n2 ++ [Add]
-  SubA n1 n2 -> compA n1 ++ compA n2 ++ [Sub]
-  MultA n1 n2 -> compA n1 ++ compA n2 ++ [Mult]
+compA expA = case expA of
+  Num num -> [Push num]
+  NumVar var -> [Fetch var]
+  AddA left right -> compA right ++ compA left ++ [Add]
+  SubA left right -> compA right ++ compA left ++ [Sub]
+  MultA left right -> compA right ++ compA left ++ [Mult]
 
+
+-- Compiles a boolean expression
 compB :: Bexp -> Code
-compB exprB = case exprB of
-  TruB -> [Tru]
-  FalsB -> [Fals]
-  EqB n1 n2 -> compA n1 ++ compA n2 ++ [Equ]
-  LeB n1 n2 -> compA n1 ++ compA n2 ++ [Le]
-  NegB b -> compB b ++ [Neg]
-  AndB b1 b2 -> compB b1 ++ compB b2 ++ [And]
+compB expB = case expB of
+  Bool bool -> if bool then [Tru] else [Fals]
+  BoolVar var -> [Fetch var]
+  EqA left right -> compA right ++ compA left ++ [Equ]
+  LeA left right -> compA right ++ compA left ++ [Le]
+  EqB left right -> compB right ++ compB left ++ [Equ]
+  AndB left right -> compB right ++ compB left ++ [And]
+  NegB exp -> compB exp ++ [Neg]
 
+
+-- Compiles a program
 compile :: Program -> Code
 compile [] = []
 compile (h:t) = case h of
-  StoreS x n -> compA n ++ [Store x] ++ compile t
-  SeqS s1 s2 -> compile [s1] ++ compile [s2] ++ compile t -- TODO
-  If bexp s1 s2 -> compB bexp ++ [Branch (compile [s1]) (compile [s2])] ++ compile t
-  While bexp s -> [Loop (compB bexp) (compile [s])] ++ compile t
+  AssignA var expA -> compA expA ++ [Store var] ++ compile t
+  AssignB var expB -> compB expB ++ [Store var] ++ compile t
+  Seq s1 s2 -> compile [s1] ++ compile [s2] ++ compile t
+  If expB s1 s2 -> compB expB ++ [Branch (compile [s1]) (compile [s2])] ++ compile t
+  While expB s -> Loop (compB expB) (compile [s]) : compile t
+
 
 --parse :: String -> Program
 parse = undefined
@@ -348,39 +362,100 @@ tests = test1 && test2 && test3 && test4 && test5 && test6 && test7 && test8 && 
 
 -- Exemplo de programa simples: x := 10;
 program1 :: Program
-program1 = [StoreS "x" (PushA 10)]
+program1 = [AssignA "x" (Num 10)]
+correct1 :: Code
+correct1 = [Push 10, Store "x"]
 
 -- Exemplo de sequência de comandos: x := 5; y := x + 3;
 program2 :: Program
-program2 = [StoreS "x" (PushA 5), StoreS "y" (AddA (PushA 2) (PushA 3))]
+program2 = [AssignA "x" (Num 5), AssignA "y" (AddA (NumVar "x") (Num 3))]
+correct2 :: Code
+correct2 = [Push 5, Store "x", Push 3, Fetch "x", Add, Store "y"]
 
 -- Exemplo de condicional: if x = 0 then y := 1 else y := 2;
 program3 :: Program
-program3 = [If (EqB (FetchA "x") (PushA 0)) (StoreS "y" (PushA 1)) (StoreS "y" (PushA 2))]
+program3 = [If (EqA (NumVar "x") (Num 0)) (AssignA "y" (Num 1)) (AssignA "y" (Num 2))]
+correct3 :: Code
+correct3 = [Push 0, Fetch "x", Equ, Branch [Push 1, Store "y"] [Push 2, Store "y"]]
 
 -- Exemplo de while loop: while x > 0 do x := x - 1;
 program4 :: Program
-program4 = [While (EqB (FetchA "x") (PushA 0)) (StoreS "x" (SubA (PushA 8) (PushA 1)))]
+program4 = [While (NegB (LeA (NumVar "x") (Num 0))) (AssignA "x" (SubA (NumVar "x") (Num 1)))]
+correct4 :: Code
+correct4 = [Loop [Push 0, Fetch "x", Le, Neg] [Push 1, Fetch "x", Sub, Store "x"]]
 
-program5 :: Program
-program5 = [While (EqB (FetchA "x") (PushA 0)) (StoreS "x" (SubA (FetchA "x") (PushA 1)))]
+-- ? Nao percebi qual era o codigo correspondente, por isso nao consegui traduzir para a nova linguagem
+-- program5 :: Program
+-- program5 = [While (EqB (FetchA "x") (PushA 0)) (StoreS "x" (SubA (FetchA "x") (PushA 1)))]
+
+-- x = 1
+assignment :: Program
+assignment = [AssignA "x" (Num 1)]
+assignment' :: Code
+assignment' = [Push 1, Store "x"]
+
+-- x = 1; y = x + 2
+addition :: Program
+addition = [AssignA "x" (Num 1), AssignA "y" (AddA (NumVar "x") (Num 2))]
+addition' :: Code
+addition' = [Push 1, Store "x", Push 2, Fetch "x", Add, Store "y"]
+
+-- x = true; y = not x
+negation :: Program
+negation = [AssignB "x" (Bool True), AssignB "y" (NegB (BoolVar "x"))]
+negation' :: Code
+negation' = [Tru, Store "x", Fetch "x", Neg, Store "y"]
+
+-- if (true) x = true else y = false
+conditional :: Program
+conditional = [If (Bool True) (AssignB "x" (Bool True)) (AssignB "y" (Bool False))]
+conditional' :: Code
+conditional' = [Tru, Branch [Tru, Store "x"] [Fals, Store "y"]]
+
+-- ! VEJAM ESTE EXEMPLO DO PDF
+-- y = 1; while (x != 1) do (y = y * x; x = x - 1)
+factorial :: Program
+factorial = [AssignA "y" (Num 1), While (NegB (EqA (NumVar "x") (Num 1))) (Seq (AssignA "y" (MultA (NumVar "y") (NumVar "x"))) (AssignA "x" (SubA (NumVar "x") (Num 1))))]
+factorial' :: Code
+factorial' = [Push 1, Store "y", Loop [Push 1, Fetch "x", Equ, Neg] [Fetch "x", Fetch "y", Mult, Store "y", Push 1, Fetch "x", Sub, Store "x"]]
 
 
--- Teste do compilador com os programas
-testCompile :: IO ()
-testCompile = do
-  putStrLn "Programa 1:"
-  print $ compile program1
-  
-  putStrLn "\nPrograma 2:"
-  print $ compile program2
-  
-  putStrLn "\nPrograma 3:"
-  print $ compile program3
-  
-  putStrLn "\nPrograma 4:"
-  print $ compile program4
+code2Str :: Code -> String
+code2Str [] = ""
+code2Str (h:t)
+  | null t = show h ++ code2Str t
+  | otherwise = show h ++ "," ++ code2Str t
 
-  putStrLn "\nPrograma 5:"
-  print $ compile program5
+testCompiler :: Program -> String
+testCompiler program = code2Str code
+  where code = compile program
 
+test1' :: Bool
+test1' = testCompiler program1 == code2Str correct1
+
+test2' :: Bool
+test2' = testCompiler program2 == code2Str correct2
+
+test3' :: Bool
+test3' = testCompiler program3 == code2Str correct3
+
+test4' :: Bool
+test4' = testCompiler program4 == code2Str correct4
+
+test5' :: Bool
+test5' = testCompiler assignment == code2Str assignment'
+
+test6' :: Bool
+test6' = testCompiler addition == code2Str addition'
+
+test7' :: Bool
+test7' = testCompiler negation == code2Str negation'
+
+test8' :: Bool
+test8' = testCompiler conditional == code2Str conditional'
+
+test9' :: Bool
+test9' = testCompiler factorial == code2Str factorial'
+
+tests' :: Bool
+tests' = test1' && test2' && test3' && test4' && test5' && test6' && test7' && test8' && test9'
