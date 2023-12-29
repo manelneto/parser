@@ -1,6 +1,6 @@
 import Data.Map (Map, fromList, toList, (!), member, insert, empty, lookup)
 import Data.List (sort, intercalate)
-import Data.Char (isAlpha, isAlphaNum, isUpper, isLower, isDigit)
+import Data.Char (isAlpha, isAlphaNum, isUpper, isLower, isDigit, digitToInt)
 
 
 data Inst =
@@ -301,6 +301,14 @@ compile (h:t) = case h of
 --parse :: String -> Program
 parse = undefined
 
+
+--parseInt :: [String] -> Maybe (Aexp, [String])
+
+
+--["x",":=","5",";","x",":=","x","-","1",";"]
+--[AssignA "x" (Num 5), AssignA "x" (SubA (NumVar "x") (Num 1))]
+--["if","(","not","true","and","2","<=","5","=","3","==","4",")","then","x",":=","1",";","else","y",":=","2",";"]
+
 -- To help you test your parser
 testParser :: String -> (String, String)
 testParser programCode = (stack2Str stack, state2Str state)
@@ -462,37 +470,42 @@ tests' :: Bool
 tests' = test1' && test2' && test3' && test4' && test5' && test6' && test7' && test8' && test9'
 
 
+data Token = AssignTok | IfTok | ThenTok | ElseTok | WhileTok | DoTok | SepTok | OpenTok | CloseTok
+           | NumTok Integer | VarTok String | PlusTok | MinusTok | MultTok | NotTok | AndTok 
+           | LessTok | LessEqTok | GreatTok | GreatEqTok | EqTok | EqBoolTok |TrueTok | FalseTok deriving Show
+           
+
 -- Auxiliar functions that splits the input string into a list of strings (tokens)
 -- Ignores words started by uppercase letters
 
-lexer :: String -> [String]
+lexer :: String -> [Token]
 lexer [] = []
 lexer (c:t) = case c of
   ' ' -> lexer t
-  ';' -> ";" : lexer t
-  '(' -> "(" : lexer t
-  ')' -> ")" : lexer t
-  '+' -> "+" : lexer t
-  '-' -> "-" : lexer t
-  '*' -> "*" : lexer t
-  '<' | t /= [] && take 1 t == "=" -> "<=" : lexer (drop 1 t)
-      | otherwise -> "<" : lexer t
-  '>' | t /= [] && take 1 t == "=" -> ">=" : lexer (drop 1 t)
-      | otherwise -> ">" : lexer t
-  '=' | t /= [] && take 1 t == "=" -> "==" : lexer (drop 1 t)
-      | otherwise -> "=" : lexer t
-  ':' | t /= [] && take 1 t == "=" -> ":=" : lexer (drop 1 t)
-  'n' | t /= [] && take 2 t == "ot" -> "not" : lexer (drop 2 t)
-  'T' | t /= [] && take  3 t == "rue" -> "true" : lexer (drop 3 t)
-  'F' | t /= [] && take 4 t == "alse" -> "false" : lexer (drop 4 t)
-  'i' | t /= [] && take 1 t == "f" -> "if" : lexer (drop 1 t)
-  't' | t /= [] && take 3 t == "hen" -> "then" : lexer (drop 3 t)
-  'e' | t /= [] && take 3 t == "lse" -> "else" : lexer (drop 3 t)
-  'w' | t /= [] && take 4 t == "hile" -> "while" : lexer (drop 4 t)
-  'd' | t /= [] && take 2 t == "do" -> "do" : lexer (drop 2 t)
-  _   | isAlpha c && isLower c -> let (var, rest) = span isAlphaNum (c:t) in var : lexer rest
+  ';' -> SepTok : lexer t
+  '(' -> OpenTok : lexer t
+  ')' -> CloseTok : lexer t
+  '+' -> PlusTok : lexer t
+  '-' -> MinusTok : lexer t
+  '*' -> MultTok : lexer t
+  '<' | t /= [] && take 1 t == "=" -> LessEqTok : lexer (drop 1 t)
+      | otherwise -> LessTok : lexer t
+  '>' | t /= [] && take 1 t == "=" -> GreatEqTok : lexer (drop 1 t)
+      | otherwise -> GreatTok : lexer t
+  '=' | t /= [] && take 1 t == "=" -> EqTok : lexer (drop 1 t)
+      | otherwise -> EqBoolTok : lexer t
+  ':' | t /= [] && take 1 t == "=" -> AssignTok : lexer (drop 1 t)
+  'n' | t /= [] && take 2 t == "ot" -> NotTok : lexer (drop 2 t)
+  'T' | t /= [] && take  3 t == "rue" -> TrueTok : lexer (drop 3 t)
+  'F' | t /= [] && take 4 t == "alse" -> FalseTok : lexer (drop 4 t)
+  'i' | t /= [] && take 1 t == "f" -> IfTok : lexer (drop 1 t)
+  't' | t /= [] && take 3 t == "hen" -> ThenTok : lexer (drop 3 t)
+  'e' | t /= [] && take 3 t == "lse" -> ElseTok : lexer (drop 3 t)
+  'w' | t /= [] && take 4 t == "hile" -> WhileTok : lexer (drop 4 t)
+  'd' | t /= [] && take 2 t == "do" -> DoTok : lexer (drop 2 t)
+  _   | isAlpha c && isLower c -> let (var, rest) = span isAlphaNum (c:t) in VarTok var : lexer rest
 --      | isAlpha c && isUpper c -> let (var, rest) = span isAlphaNum (c:t) in lexer rest
-      | isDigit c -> let (num, rest) = span isDigit (c:t) in num : lexer rest
+      | isDigit c -> let (num, rest) = span isDigit (c:t) in NumTok (fromIntegral (stringToInt num)) : lexer rest
       | otherwise -> lexer t
 
 -- Exemplos de programas
@@ -500,3 +513,8 @@ lexer (c:t) = case c of
 -- lexer "x := 0 - 2;"
 -- lexer "if (not True and 2 <= 5 = 3 == 4) then x :=1; else y := 2;"
 -- lexer "x:=23 + variable * 421;while(x !=2)"
+
+
+
+stringToInt :: String -> Int
+stringToInt=foldl (\acc chr->10*acc+digitToInt chr) 0
