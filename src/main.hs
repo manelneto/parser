@@ -220,35 +220,35 @@ testAssembler code = (stack2Str stack, state2Str state)
 -- You should get an exception with the string: "Run-time error"
 
 
-test1 :: Bool
-test1 = testAssembler [Push 10,Push 4,Push 3,Sub,Mult] == ("-10","")
+-- test1 :: Bool
+-- test1 = testAssembler [Push 10,Push 4,Push 3,Sub,Mult] == ("-10","")
 
-test2 :: Bool
-test2 = testAssembler [Fals,Push 3,Tru,Store "var",Store "a", Store "someVar"] == ("","a=3,someVar=False,var=True")
+-- test2 :: Bool
+-- test2 = testAssembler [Fals,Push 3,Tru,Store "var",Store "a", Store "someVar"] == ("","a=3,someVar=False,var=True")
 
-test3 :: Bool
-test3 = testAssembler [Fals,Store "var",Fetch "var"] == ("False","var=False")
+-- test3 :: Bool
+-- test3 = testAssembler [Fals,Store "var",Fetch "var"] == ("False","var=False")
 
-test4 :: Bool
-test4 = testAssembler [Push (-20),Tru,Fals] == ("False,True,-20","")
+-- test4 :: Bool
+-- test4 = testAssembler [Push (-20),Tru,Fals] == ("False,True,-20","")
 
-test5 :: Bool
-test5 = testAssembler [Push (-20),Tru,Tru,Neg] == ("False,True,-20","")
+-- test5 :: Bool
+-- test5 = testAssembler [Push (-20),Tru,Tru,Neg] == ("False,True,-20","")
 
-test6 :: Bool
-test6 = testAssembler [Push (-20),Tru,Tru,Neg,Equ] == ("False,-20","")
+-- test6 :: Bool
+-- test6 = testAssembler [Push (-20),Tru,Tru,Neg,Equ] == ("False,-20","")
 
-test7 :: Bool
-test7 = testAssembler [Push (-20),Push (-21), Le] == ("True","")
+-- test7 :: Bool
+-- test7 = testAssembler [Push (-20),Push (-21), Le] == ("True","")
 
-test8 :: Bool
-test8 = testAssembler [Push 5,Store "x",Push 1,Fetch "x",Sub,Store "x"] == ("","x=4")
+-- test8 :: Bool
+-- test8 = testAssembler [Push 5,Store "x",Push 1,Fetch "x",Sub,Store "x"] == ("","x=4")
 
-test9 :: Bool
-test9 = testAssembler [Push 10,Store "i",Push 1,Store "fact",Loop [Push 1,Fetch "i",Equ,Neg] [Fetch "i",Fetch "fact",Mult,Store "fact",Push 1,Fetch "i",Sub,Store "i"]] == ("","fact=3628800,i=1")
+-- test9 :: Bool
+-- test9 = testAssembler [Push 10,Store "i",Push 1,Store "fact",Loop [Push 1,Fetch "i",Equ,Neg] [Fetch "i",Fetch "fact",Mult,Store "fact",Push 1,Fetch "i",Sub,Store "i"]] == ("","fact=3628800,i=1")
 
-tests :: Bool
-tests = test1 && test2 && test3 && test4 && test5 && test6 && test7 && test8 && test9
+-- tests :: Bool
+-- tests = test1 && test2 && test3 && test4 && test5 && test6 && test7 && test8 && test9
 
 
 -- Part 2
@@ -301,70 +301,63 @@ compile (h:t) = case h of
 
 -- uses the parseAux function to get the program
 parse :: String -> Program
-parse input = case parseAux (lexer input) of
-  Just (program, []) -> program
-  Nothing -> []
+parse input = parseAux (lexer input)
 
-parseAux :: [Token] -> Maybe (Program, [Token])
-parseAux [] = Just ([], [])
-parseAux tokens = case parseStm tokens of
-  Just (stm, restTokens) -> case parseAux restTokens of
-    Just (program, restTokens) -> Just (stm : program, restTokens)
-    Nothing -> Nothing
-  Nothing -> Nothing
-
-parseStm :: [Token] -> Maybe (Stm, [Token])
-parseStm tokens = case parseAssign tokens of
-  Just (assign, restTokens) -> Just (assign, restTokens)
-  Nothing -> Nothing
-
+parseAux :: [Token] -> Program
+parseAux [] = []
+parseAux tokens = case parseAssign instruction of
+  Just (assignStm, _) -> assignStm : parseAux (drop 1 (dropWhile (/= SepTok) tokens)) 
+  Nothing -> [] 
+  where instruction = takeWhile (/= SepTok) tokens
+        
 parseAssign :: [Token] -> Maybe (Stm, [Token])
-parseAssign (VarTok varName : AssignTok : restTokens) = case parseAexp restTokens of
+parseAssign (VarTok varName : AssignTok : restTokens) = case parseAexp restTokens of 
+  Just (varValue, []) -> Just (AssignA varName varValue, []) 
   Just (varValue, restTokens) -> Just (AssignA varName varValue, restTokens)
   Nothing -> Nothing
 parseAssign _ = Nothing
 
 
+
+
 parseAexp :: [Token] -> Maybe (Aexp, [Token])
-parseAexp tokens = case parseInt tokens of
-  Just (num, restTokens) -> Just (num, restTokens) `debug` "Hello"
-  Nothing -> case parseVar tokens of
-    Just (var, restTokens) -> Just (var, restTokens) 
-    Nothing -> case parseAddA tokens of
-      Just (addA, restTokens) -> Just (addA, restTokens) `debug` "Hello"
-      Nothing -> case parseSubA tokens of
-        Just (subA, restTokens) -> Just (subA, restTokens)
-        Nothing -> case parseMultA tokens of
-          Just (multA, restTokens) -> Just (multA, restTokens)
-          Nothing -> Nothing
+parseAexp tokens = case parseMultA tokens of
+      Just (multA, restTokens) -> Just (multA, restTokens)
+      Nothing -> case parseAddA tokens of
+        Just (addA, restTokens) -> Just (addA, restTokens) 
+        Nothing -> case parseSubA tokens of
+            Just (subA, restTokens) -> Just (subA, restTokens)
+            Nothing -> case parseInt tokens of
+                Just (num, restTokens) -> Just (num, restTokens) 
+                Nothing -> case parseVar tokens of
+                  Just (var, restTokens) -> Just (var, restTokens)
+                  Nothing -> Nothing
 
 parseAddA :: [Token] -> Maybe (Aexp, [Token])
-parseAddA tokens = case parseAexp tokens of
-  Just (left, PlusTok : restTokens) -> case parseAexp restTokens of
-    Just (right, restTokens) -> Just (AddA left right, restTokens) 
-    Nothing -> Nothing
-  Nothing -> Nothing
+parseAddA (left : PlusTok : restTokens) = case parseAexp restTokens of
+    Just (right, restTokens) -> Just (AddA leftVal right, restTokens) where
+      Just (leftVal, _) = parseInt [left]
+    Nothing -> Nothing 
+parseAddA _ = Nothing
 
 parseSubA :: [Token] -> Maybe (Aexp, [Token])
-parseSubA tokens = case parseAexp tokens of
-  Just (left, MinusTok : restTokens) -> case parseAexp restTokens of
-    Just (right, restTokens) -> Just (SubA left right, restTokens)
+parseSubA (left : MinusTok : restTokens) = case parseAexp restTokens of
+    Just (right, restTokens) -> Just (SubA leftVal right, restTokens) where
+      Just (leftVal, _) = parseInt [left]
     Nothing -> Nothing
-  Nothing -> Nothing
+parseSubA _ = Nothing
 
 parseMultA :: [Token] -> Maybe (Aexp, [Token])
-parseMultA tokens = case parseAexp tokens of
-  Just (left, MultTok : restTokens) -> case parseAexp restTokens of
-    Just (right, restTokens) -> Just (MultA left right, restTokens)
+parseMultA (left : MultTok : restTokens) = case parseAexp restTokens of
+    Just (right, restTokens) -> Just (MultA leftVal right, restTokens) where
+      Just (leftVal, _) = parseInt [left]
     Nothing -> Nothing
-  Nothing -> Nothing
-
-
+parseMultA _ = Nothing
 
 parseInt :: [Token] -> Maybe (Aexp, [Token])
 parseInt (NumTok n : restTokens) = Just (Num n, restTokens)
+parseInt (VarTok var : restTokens) = Just (NumVar var, restTokens)
 parseInt tokens = Nothing
-
 
 parseVar :: [Token] -> Maybe (Aexp, [Token]) -- TODO - parseVar para booleanos (GL)
 parseVar (VarTok var : restTokens) = Just (NumVar var, restTokens)
@@ -395,7 +388,7 @@ testParser programCode = (stack2Str stack, state2Str state)
 -- testParser "x := 2; y := (x - 3)*(4 + 2*3); z := x +x*(2);" == ("","x=2,y=-10,z=6")
 -- testParser "i := 10; fact := 1; while (not(i == 1)) do (fact := fact * i; i := i - 1;);" == ("","fact=3628800,i=1")
 
-{-
+
 test1 :: Bool
 test1 = testParser "x := 5; x := x - 1;" == ("","x=4")
 
@@ -434,7 +427,7 @@ test12 = testParser "i := 10; fact := 1; while (not(i == 1)) do (fact := fact * 
 
 tests :: Bool
 tests = test1 && test2 && test3 && test4 && test5 && test6 && test7 && test8 && test9 && test10 && test11 && test12
--}
+
 
 -- Exemplo de programa simples: x := 10;
 program1 :: Program
@@ -539,7 +532,7 @@ tests' = test1' && test2' && test3' && test4' && test5' && test6' && test7' && t
 
 data Token = AssignTok | IfTok | ThenTok | ElseTok | WhileTok | DoTok | SepTok | OpenTok | CloseTok
            | NumTok Integer | VarTok String | PlusTok | MinusTok | MultTok | NotTok | AndTok 
-           | LessTok | LessEqTok | GreatTok | GreatEqTok | EqTok | EqBoolTok |TrueTok | FalseTok deriving Show
+           | LessTok | LessEqTok | GreatTok | GreatEqTok | EqTok | EqBoolTok |TrueTok | FalseTok deriving (Show, Eq)
            
 
 -- Auxiliar functions that splits the input string into a list of strings (tokens)
