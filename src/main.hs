@@ -315,7 +315,7 @@ parseAssign _ = Nothing
 
 parseIfThenElse :: [Token] -> [Token] -> [Token] -> Maybe (Stm, [Token])
 parseIfThenElse tokens1 tokens2 tokens3 = case parseBexp tokens1 of
-  Just (condition, (ThenTok : restTokens1)) -> case parseAux tokens2 of
+  Just (condition, _) -> case parseAux tokens2 of
     [] -> Nothing
     thenStm -> case parseAux tokens3 of
       [] -> Nothing
