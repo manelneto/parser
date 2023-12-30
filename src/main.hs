@@ -261,7 +261,7 @@ data Aexp = Num Integer | NumVar String | AddA Aexp Aexp | SubA Aexp Aexp | Mult
 data Bexp = Bool Bool | EqA Aexp Aexp | LeA Aexp Aexp | EqB Bexp Bexp | AndB Bexp Bexp | NegB Bexp deriving Show
 
 -- Stm is a statement
-data Stm = Assign String Aexp | If Bexp Stm Stm | While Bexp Stm | Seq Stm Stm deriving Show
+data Stm = Assign String Aexp | If Bexp [Stm] [Stm] | While Bexp [Stm] deriving Show
 
 -- Program is a list of statements
 type Program = [Stm]
@@ -293,9 +293,8 @@ compile :: Program -> Code
 compile [] = []
 compile (h:t) = case h of
   Assign var expA -> compA expA ++ [Store var] ++ compile t
-  Seq s1 s2 -> compile [s1] ++ compile [s2] ++ compile t
-  If expB s1 s2 -> compB expB ++ [Branch (compile [s1]) (compile [s2])] ++ compile t
-  While expB s -> Loop (compB expB) (compile [s]) : compile t
+  If expB s1 s2 -> compB expB ++ [Branch (compile s1) (compile s2)] ++ compile t
+  While expB s -> Loop (compB expB) (compile s) : compile t
 
 -- uses the parseAux function to get the program
 parse :: String -> Program
@@ -313,6 +312,9 @@ parseAssign (VarTok varName : AssignTok : restTokens) = case parseAexp restToken
   Just (varValue, _) -> Just (Assign varName varValue, []) 
   Nothing -> Nothing
 parseAssign _ = Nothing
+
+
+
 
 parseAexp :: [Token] -> Maybe (Aexp, [Token])
 parseAexp tokens = case parseMultIntPar tokens of
@@ -470,19 +472,19 @@ correct2 = [Push 5, Store "x", Push 3, Fetch "x", Add, Store "y"]
 
 -- Exemplo de condicional: if x = 0 then y := 1 else y := 2;
 program3 :: Program
-program3 = [If (EqA (NumVar "x") (Num 0)) (Assign "y" (Num 1)) (Assign "y" (Num 2))]
+program3 = [If (EqA (NumVar "x") (Num 0)) [Assign "y" (Num 1)] [Assign "y" (Num 2)]]
 correct3 :: Code
 correct3 = [Push 0, Fetch "x", Equ, Branch [Push 1, Store "y"] [Push 2, Store "y"]]
 
 -- Exemplo de while loop: while x > 0 do x := x - 1;
 program4 :: Program
-program4 = [While (NegB (LeA (NumVar "x") (Num 0))) (Assign "x" (SubA (NumVar "x") (Num 1)))]
+program4 = [While (NegB (LeA (NumVar "x") (Num 0))) [Assign "x" (SubA (NumVar "x") (Num 1))]]
 correct4 :: Code
 correct4 = [Loop [Push 0, Fetch "x", Le, Neg] [Push 1, Fetch "x", Sub, Store "x"]]
 
 -- Exemplo de while loop: while x != 0 do x := x - 1;
 program5 :: Program
-program5 = [Assign "x" (Num 10),While (NegB (EqA (NumVar "x") (Num 0))) (Assign "x" (SubA (NumVar "x") (Num 1)))]
+program5 = [Assign "x" (Num 10),While (NegB (EqA (NumVar "x") (Num 0))) [Assign "x" (SubA (NumVar "x") (Num 1))]]
 
 -- x = 1
 assignment :: Program
@@ -500,7 +502,7 @@ addition' = [Push 1, Store "x", Push 2, Fetch "x", Add, Store "y"]
 -- ! VEJAM ESTE EXEMPLO DO PDF
 -- y = 1; while (x != 1) do (y = y * x; x = x - 1)
 factorial :: Program
-factorial = [Assign "y" (Num 1), While (NegB (EqA (NumVar "x") (Num 1))) (Seq (Assign "y" (MultA (NumVar "y") (NumVar "x"))) (Assign "x" (SubA (NumVar "x") (Num 1))))]
+factorial = [Assign "y" (Num 1), While (NegB (EqA (NumVar "x") (Num 1))) [Assign "y" (MultA (NumVar "y") (NumVar "x")), Assign "x" (SubA (NumVar "x") (Num 1))]]
 factorial' :: Code
 factorial' = [Push 1, Store "y", Loop [Push 1, Fetch "x", Equ, Neg] [Fetch "x", Fetch "y", Mult, Store "y", Push 1, Fetch "x", Sub, Store "x"]]
 
