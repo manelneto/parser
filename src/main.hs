@@ -304,10 +304,10 @@ parse input = parseAux (lexer input)
 parseAux :: [Token] -> Program
 parseAux [] = []
 parseAux tokens = case parseAssign instruction of
-  Just (assignStm, _) -> assignStm : parseAux (drop 1 (dropWhile (/= SepTok) tokens)) 
-  Nothing -> [] 
+  Just (assignStm, []) -> assignStm : parseAux (drop 1 (dropWhile (/= SepTok) tokens))
+  _ -> error "Parse error"
   where instruction = takeWhile (/= SepTok) tokens
-        
+
 parseAssign :: [Token] -> Maybe (Stm, [Token])
 parseAssign (VarTok varName : AssignTok : restTokens) = case parseAexp restTokens of 
   Just (varValue, _) -> Just (Assign varName varValue, []) 
@@ -315,96 +315,77 @@ parseAssign (VarTok varName : AssignTok : restTokens) = case parseAexp restToken
 parseAssign _ = Nothing
 
 parseAexp :: [Token] -> Maybe (Aexp, [Token])
-parseAexp tokens = case parseMultA tokens of
-      Just (multA, restTokens) -> Just (multA, restTokens)
-      Nothing -> case parseAddA tokens of
-        Just (addA, restTokens) -> Just (addA, restTokens) 
-        Nothing -> case parseSubA tokens of
-            Just (subA, restTokens) -> Just (subA, restTokens)
-            Nothing -> case parseInt tokens of
-                Just (num, restTokens) -> Just (num, restTokens) 
-                Nothing -> Nothing
-
-parseAddA :: [Token] -> Maybe (Aexp, [Token])
-parseAddA (left : PlusTok : restTokens) = case parseAexp restTokens of
-    Just (right, restTokens) -> Just (AddA leftVal right, restTokens) where
-      Just (leftVal, _) = parseInt [left]
-    Nothing -> Nothing 
-parseAddA _ = Nothing
-
-parseSubA :: [Token] -> Maybe (Aexp, [Token])
-parseSubA (left : MinusTok : restTokens) = case parseAexp restTokens of
-    Just (right, restTokens) -> Just (SubA leftVal right, restTokens) where
-      Just (leftVal, _) = parseInt [left]
+parseAexp tokens = case parseMultIntPar tokens of
+  Just (expr1, (PlusTok : restTokens1)) -> case parseMultIntPar restTokens1 of
+    Just (expr2, restTokens2) -> Just (AddA expr1 expr2, restTokens2)
     Nothing -> Nothing
-parseSubA _ = Nothing
-
-parseMultA :: [Token] -> Maybe (Aexp, [Token])
-parseMultA (left : MultTok : restTokens) = case parseAexp restTokens of
-    Just (right, restTokens) -> Just (MultA leftVal right, restTokens) where
-      Just (leftVal, _) = parseInt [left]
+  Just (expr1, (MinusTok : restTokens1)) -> case parseMultIntPar restTokens1 of
+    Just (expr2, restTokens2) -> Just (SubA expr1 expr2, restTokens2)
     Nothing -> Nothing
-parseMultA _ = Nothing
+  result -> result
 
-parseInt :: [Token] -> Maybe (Aexp, [Token])
-parseInt (NumTok n : restTokens) = Just (Num n, restTokens)
-parseInt (VarTok var : restTokens) = Just (NumVar var, restTokens)
-parseInt tokens = Nothing
+
+parseMultIntPar :: [Token] -> Maybe (Aexp, [Token])
+parseMultIntPar tokens = case parseIntPar tokens of 
+  Just (expr1, (MultTok : restTokens1)) -> case parseMultIntPar restTokens1 of
+    Just (expr2, restTokens2) -> Just (MultA expr1 expr2, restTokens2)
+    Nothing -> Nothing
+  result -> result
+
+
+parseIntPar :: [Token] -> Maybe (Aexp, [Token])
+parseIntPar (NumTok n : restTokens) = Just (Num n, restTokens)
+parseIntPar (VarTok var : restTokens) = Just (NumVar var, restTokens)
+parseIntPar (OpenTok : restTokens1) = case parseAexp restTokens1 of
+  Just (expr, (CloseTok : restTokens2)) -> Just (expr, restTokens2)
+  _ -> Nothing
+parseIntPar tokens = Nothing
+
 
 
 parseBexp :: [Token] -> Maybe (Bexp, [Token])
-parseBexp tokens = case parseEqA tokens of
-      Just (eqA, restTokens) -> Just (eqA, restTokens)
-      Nothing -> case parseLeA tokens of
-        Just (leA, restTokens) -> Just (leA, restTokens) 
-        Nothing -> case parseEqB tokens of
-            Just (eqB, restTokens) -> Just (eqB, restTokens)
-            Nothing -> case parseAndB tokens of
-                Just (andB, restTokens) -> Just (andB, restTokens) 
-                Nothing -> case parseNegB tokens of
-                    Just (negB, restTokens) -> Just (negB, restTokens) 
-                    Nothing -> case parseBool tokens of
-                        Just (bool, restTokens) -> Just (bool, restTokens) 
-                        Nothing -> Nothing
-
-parseEqA :: [Token] -> Maybe (Bexp, [Token])
-parseEqA (left : EqTok : restTokens) = case parseAexp restTokens of
-    Just (right, restTokens) -> Just (EqA leftVal right, restTokens) where
-      Just (leftVal, _) = parseInt [left]
+parseBexp tokens = case parseEqBNegEqALeBoolPar tokens of
+  Just (expr1, (AndTok : restTokens1)) -> case parseBexp restTokens1 of
+    Just (expr2, restTokens2) -> Just (AndB expr1 expr2, restTokens2)
     Nothing -> Nothing
-parseEqA _ = Nothing
+  result -> result
 
-parseLeA :: [Token] -> Maybe (Bexp, [Token])
-parseLeA (left : LessEqTok : restTokens) = case parseAexp restTokens of
-    Just (right, restTokens) -> Just (LeA leftVal right, restTokens) where
-      Just (leftVal, _) = parseInt [left]
+
+parseEqBNegEqALeBoolPar :: [Token] -> Maybe (Bexp, [Token])
+parseEqBNegEqALeBoolPar tokens = case parseNegEqALeBoolPar tokens of
+  Just (expr1, (EqBoolTok : restTokens1)) -> case parseEqALeBoolPar restTokens1 of
+    Just (expr2, restTokens2) -> Just (EqB expr1 expr2, restTokens2)
     Nothing -> Nothing
-parseLeA _ = Nothing
+  result -> result
 
-parseEqB :: [Token] -> Maybe (Bexp, [Token])
-parseEqB (left : EqBoolTok : restTokens) = case parseBexp restTokens of
-    Just (right, restTokens) -> Just (EqB leftVal right, restTokens) where
-      Just (leftVal, _) = parseBool [left]
+parseNegEqALeBoolPar :: [Token] -> Maybe (Bexp, [Token])
+parseNegEqALeBoolPar tokens = case parseEqALeBoolPar tokens of
+  Just (expr,(NotTok : restTokens)) -> Just (NegB expr, restTokens)
+  result -> result
+
+parseEqALeBoolPar :: [Token] -> Maybe (Bexp, [Token])
+parseEqALeBoolPar tokens = case parseAexp tokens of
+  Just (expr1, (EqTok : restTokens1)) -> case parseAexp restTokens1 of
+    Just (expr2, restTokens2) -> Just (EqA expr1 expr2, restTokens2)
     Nothing -> Nothing
-parseEqB _ = Nothing
+  Just (_, _) -> parseLeBoolPar tokens
+  _ -> Nothing
 
-parseAndB :: [Token] -> Maybe (Bexp, [Token])
-parseAndB (left : AndTok : restTokens) = case parseBexp restTokens of
-    Just (right, restTokens) -> Just (AndB leftVal right, restTokens) where
-      Just (leftVal, _) = parseBool [left]
+parseLeBoolPar :: [Token] -> Maybe (Bexp, [Token])
+parseLeBoolPar tokens = case parseAexp tokens of
+  Just (expr1, (LessEqTok : restTokens1)) -> case parseAexp restTokens1 of
+    Just (expr2, restTokens2) -> Just (LeA expr1 expr2, restTokens2)
     Nothing -> Nothing
-parseAndB _ = Nothing
+  Just (_, _) -> parseBoolPar tokens
+  _ -> Nothing
 
-parseNegB :: [Token] -> Maybe (Bexp, [Token])
-parseNegB (NotTok : restTokens) = case parseBexp restTokens of
-    Just (exp, restTokens) -> Just (NegB exp, restTokens)
-    Nothing -> Nothing
-parseNegB _ = Nothing
-
-parseBool :: [Token] -> Maybe (Bexp, [Token])
-parseBool (TrueTok : restTokens) = Just (Bool True, restTokens)
-parseBool (FalseTok : restTokens) = Just (Bool False, restTokens)
-parseBool _ = Nothing
+parseBoolPar :: [Token] -> Maybe (Bexp, [Token])
+parseBoolPar (TrueTok : restTokens) = Just (Bool True, restTokens)
+parseBoolPar (FalseTok : restTokens) = Just (Bool False, restTokens)
+parseBoolPar (OpenTok : restTokens1) = case parseBexp restTokens1 of
+  Just (exp, (CloseTok : restTokens2)) -> Just (exp, restTokens2)
+  _ -> Nothing
+parseBoolPar _ = Nothing
 
 
 
