@@ -258,10 +258,10 @@ testAssembler code = (stack2Str stack, state2Str state)
 data Aexp = Num Integer | NumVar String | AddA Aexp Aexp | SubA Aexp Aexp | MultA Aexp Aexp deriving Show
 
 -- Bexp is a boolean expression
-data Bexp = Bool Bool | BoolVar String | EqA Aexp Aexp | LeA Aexp Aexp | EqB Bexp Bexp | AndB Bexp Bexp | NegB Bexp deriving Show
+data Bexp = Bool Bool | EqA Aexp Aexp | LeA Aexp Aexp | EqB Bexp Bexp | AndB Bexp Bexp | NegB Bexp deriving Show
 
 -- Stm is a statement
-data Stm = AssignA String Aexp | AssignB String Bexp | If Bexp Stm Stm | While Bexp Stm | Seq Stm Stm deriving Show
+data Stm = Assign String Aexp | If Bexp Stm Stm | While Bexp Stm | Seq Stm Stm deriving Show
 
 -- Program is a list of statements
 type Program = [Stm]
@@ -281,7 +281,6 @@ compA expA = case expA of
 compB :: Bexp -> Code
 compB expB = case expB of
   Bool bool -> if bool then [Tru] else [Fals]
-  BoolVar var -> [Fetch var]
   EqA left right -> compA right ++ compA left ++ [Equ]
   LeA left right -> compA right ++ compA left ++ [Le]
   EqB left right -> compB right ++ compB left ++ [Equ]
@@ -293,8 +292,7 @@ compB expB = case expB of
 compile :: Program -> Code
 compile [] = []
 compile (h:t) = case h of
-  AssignA var expA -> compA expA ++ [Store var] ++ compile t
-  AssignB var expB -> compB expB ++ [Store var] ++ compile t
+  Assign var expA -> compA expA ++ [Store var] ++ compile t
   Seq s1 s2 -> compile [s1] ++ compile [s2] ++ compile t
   If expB s1 s2 -> compB expB ++ [Branch (compile [s1]) (compile [s2])] ++ compile t
   While expB s -> Loop (compB expB) (compile [s]) : compile t
@@ -312,13 +310,9 @@ parseAux tokens = case parseAssign instruction of
         
 parseAssign :: [Token] -> Maybe (Stm, [Token])
 parseAssign (VarTok varName : AssignTok : restTokens) = case parseAexp restTokens of 
-  Just (varValue, []) -> Just (AssignA varName varValue, []) 
-  Just (varValue, restTokens) -> Just (AssignA varName varValue, restTokens)
+  Just (varValue, _) -> Just (Assign varName varValue, []) 
   Nothing -> Nothing
 parseAssign _ = Nothing
-
-
-
 
 parseAexp :: [Token] -> Maybe (Aexp, [Token])
 parseAexp tokens = case parseMultA tokens of
@@ -329,9 +323,7 @@ parseAexp tokens = case parseMultA tokens of
             Just (subA, restTokens) -> Just (subA, restTokens)
             Nothing -> case parseInt tokens of
                 Just (num, restTokens) -> Just (num, restTokens) 
-                Nothing -> case parseVar tokens of
-                  Just (var, restTokens) -> Just (var, restTokens)
-                  Nothing -> Nothing
+                Nothing -> Nothing
 
 parseAddA :: [Token] -> Maybe (Aexp, [Token])
 parseAddA (left : PlusTok : restTokens) = case parseAexp restTokens of
@@ -359,9 +351,63 @@ parseInt (NumTok n : restTokens) = Just (Num n, restTokens)
 parseInt (VarTok var : restTokens) = Just (NumVar var, restTokens)
 parseInt tokens = Nothing
 
-parseVar :: [Token] -> Maybe (Aexp, [Token]) -- TODO - parseVar para booleanos (GL)
-parseVar (VarTok var : restTokens) = Just (NumVar var, restTokens)
-parseVar tokens = Nothing
+
+parseBexp :: [Token] -> Maybe (Bexp, [Token])
+parseBexp tokens = case parseEqA tokens of
+      Just (eqA, restTokens) -> Just (eqA, restTokens)
+      Nothing -> case parseLeA tokens of
+        Just (leA, restTokens) -> Just (leA, restTokens) 
+        Nothing -> case parseEqB tokens of
+            Just (eqB, restTokens) -> Just (eqB, restTokens)
+            Nothing -> case parseAndB tokens of
+                Just (andB, restTokens) -> Just (andB, restTokens) 
+                Nothing -> case parseNegB tokens of
+                    Just (negB, restTokens) -> Just (negB, restTokens) 
+                    Nothing -> case parseBool tokens of
+                        Just (bool, restTokens) -> Just (bool, restTokens) 
+                        Nothing -> Nothing
+
+parseEqA :: [Token] -> Maybe (Bexp, [Token])
+parseEqA (left : EqTok : restTokens) = case parseAexp restTokens of
+    Just (right, restTokens) -> Just (EqA leftVal right, restTokens) where
+      Just (leftVal, _) = parseInt [left]
+    Nothing -> Nothing
+parseEqA _ = Nothing
+
+parseLeA :: [Token] -> Maybe (Bexp, [Token])
+parseLeA (left : LessEqTok : restTokens) = case parseAexp restTokens of
+    Just (right, restTokens) -> Just (LeA leftVal right, restTokens) where
+      Just (leftVal, _) = parseInt [left]
+    Nothing -> Nothing
+parseLeA _ = Nothing
+
+parseEqB :: [Token] -> Maybe (Bexp, [Token])
+parseEqB (left : EqBoolTok : restTokens) = case parseBexp restTokens of
+    Just (right, restTokens) -> Just (EqB leftVal right, restTokens) where
+      Just (leftVal, _) = parseBool [left]
+    Nothing -> Nothing
+parseEqB _ = Nothing
+
+parseAndB :: [Token] -> Maybe (Bexp, [Token])
+parseAndB (left : AndTok : restTokens) = case parseBexp restTokens of
+    Just (right, restTokens) -> Just (AndB leftVal right, restTokens) where
+      Just (leftVal, _) = parseBool [left]
+    Nothing -> Nothing
+parseAndB _ = Nothing
+
+parseNegB :: [Token] -> Maybe (Bexp, [Token])
+parseNegB (NotTok : restTokens) = case parseBexp restTokens of
+    Just (exp, restTokens) -> Just (NegB exp, restTokens)
+    Nothing -> Nothing
+parseNegB _ = Nothing
+
+parseBool :: [Token] -> Maybe (Bexp, [Token])
+parseBool (TrueTok : restTokens) = Just (Bool True, restTokens)
+parseBool (FalseTok : restTokens) = Just (Bool False, restTokens)
+parseBool _ = Nothing
+
+
+
 
 
 -- "x:=1"
@@ -382,7 +428,7 @@ testParser programCode = (stack2Str stack, state2Str state)
 -- testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1;" == ("","x=2")
 -- testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1; z := x+x;" == ("","x=2,z=4")
 -- testParser "x := 44; if x <= 43 then x := 1; else (x := 33; x := x+1;); y := x*2;" == ("","x=34,y=68")
--- testParser "x := 42; if x <= 43 then (x := 33; x := x+1;) else x := 1;" == ("","x=34")
+-- testParser "x := 42; if x <= 43 then (x := 33; x := x+1;); else x := 1;" == ("","x=34")
 -- testParser "if (1 == 0+1 = 2+1 == 3) then x := 1; else x := 2;" == ("","x=1")
 -- testParser "if (1 == 0+1 = (2+1 == 4)) then x := 1; else x := 2;" == ("","x=2")
 -- testParser "x := 2; y := (x - 3)*(4 + 2*3); z := x +x*(2);" == ("","x=2,y=-10,z=6")
@@ -431,60 +477,49 @@ tests = test1 && test2 && test3 && test4 && test5 && test6 && test7 && test8 && 
 
 -- Exemplo de programa simples: x := 10;
 program1 :: Program
-program1 = [AssignA "x" (Num 10)]
+program1 = [Assign "x" (Num 10)]
 correct1 :: Code
 correct1 = [Push 10, Store "x"]
 
 -- Exemplo de sequência de comandos: x := 5; y := x + 3;
 program2 :: Program
-program2 = [AssignA "x" (Num 5), AssignA "y" (AddA (NumVar "x") (Num 3))]
+program2 = [Assign "x" (Num 5), Assign "y" (AddA (NumVar "x") (Num 3))]
 correct2 :: Code
 correct2 = [Push 5, Store "x", Push 3, Fetch "x", Add, Store "y"]
 
 -- Exemplo de condicional: if x = 0 then y := 1 else y := 2;
 program3 :: Program
-program3 = [If (EqA (NumVar "x") (Num 0)) (AssignA "y" (Num 1)) (AssignA "y" (Num 2))]
+program3 = [If (EqA (NumVar "x") (Num 0)) (Assign "y" (Num 1)) (Assign "y" (Num 2))]
 correct3 :: Code
 correct3 = [Push 0, Fetch "x", Equ, Branch [Push 1, Store "y"] [Push 2, Store "y"]]
 
 -- Exemplo de while loop: while x > 0 do x := x - 1;
 program4 :: Program
-program4 = [While (NegB (LeA (NumVar "x") (Num 0))) (AssignA "x" (SubA (NumVar "x") (Num 1)))]
+program4 = [While (NegB (LeA (NumVar "x") (Num 0))) (Assign "x" (SubA (NumVar "x") (Num 1)))]
 correct4 :: Code
 correct4 = [Loop [Push 0, Fetch "x", Le, Neg] [Push 1, Fetch "x", Sub, Store "x"]]
 
 -- Exemplo de while loop: while x != 0 do x := x - 1;
 program5 :: Program
-program5 = [AssignA "x" (Num 10),While (NegB (EqA (NumVar "x") (Num 0))) (AssignA "x" (SubA (NumVar "x") (Num 1)))]
+program5 = [Assign "x" (Num 10),While (NegB (EqA (NumVar "x") (Num 0))) (Assign "x" (SubA (NumVar "x") (Num 1)))]
 
 -- x = 1
 assignment :: Program
-assignment = [AssignA "x" (Num 1)]
+assignment = [Assign "x" (Num 1)]
 assignment' :: Code
 assignment' = [Push 1, Store "x"]
 
 -- x = 1; y = x + 2
 addition :: Program
-addition = [AssignA "x" (Num 1), AssignA "y" (AddA (NumVar "x") (Num 2))]
+addition = [Assign "x" (Num 1), Assign "y" (AddA (NumVar "x") (Num 2))]
 addition' :: Code
 addition' = [Push 1, Store "x", Push 2, Fetch "x", Add, Store "y"]
 
--- x = true; y = not x
-negation :: Program
-negation = [AssignB "x" (Bool True), AssignB "y" (NegB (BoolVar "x"))]
-negation' :: Code
-negation' = [Tru, Store "x", Fetch "x", Neg, Store "y"]
-
--- if (true) x = true else y = false
-conditional :: Program
-conditional = [If (Bool True) (AssignB "x" (Bool True)) (AssignB "y" (Bool False))]
-conditional' :: Code
-conditional' = [Tru, Branch [Tru, Store "x"] [Fals, Store "y"]]
 
 -- ! VEJAM ESTE EXEMPLO DO PDF
 -- y = 1; while (x != 1) do (y = y * x; x = x - 1)
 factorial :: Program
-factorial = [AssignA "y" (Num 1), While (NegB (EqA (NumVar "x") (Num 1))) (Seq (AssignA "y" (MultA (NumVar "y") (NumVar "x"))) (AssignA "x" (SubA (NumVar "x") (Num 1))))]
+factorial = [Assign "y" (Num 1), While (NegB (EqA (NumVar "x") (Num 1))) (Seq (Assign "y" (MultA (NumVar "y") (NumVar "x"))) (Assign "x" (SubA (NumVar "x") (Num 1))))]
 factorial' :: Code
 factorial' = [Push 1, Store "y", Loop [Push 1, Fetch "x", Equ, Neg] [Fetch "x", Fetch "y", Mult, Store "y", Push 1, Fetch "x", Sub, Store "x"]]
 
@@ -518,21 +553,15 @@ test6' :: Bool
 test6' = testCompiler addition == code2Str addition'
 
 test7' :: Bool
-test7' = testCompiler negation == code2Str negation'
-
-test8' :: Bool
-test8' = testCompiler conditional == code2Str conditional'
-
-test9' :: Bool
-test9' = testCompiler factorial == code2Str factorial'
+test7' = testCompiler factorial == code2Str factorial'
 
 tests' :: Bool
-tests' = test1' && test2' && test3' && test4' && test5' && test6' && test7' && test8' && test9'
+tests' = test1' && test2' && test3' && test4' && test5' && test6' && test7'
 
 
 data Token = AssignTok | IfTok | ThenTok | ElseTok | WhileTok | DoTok | SepTok | OpenTok | CloseTok
            | NumTok Integer | VarTok String | PlusTok | MinusTok | MultTok | NotTok | AndTok 
-           | LessTok | LessEqTok | GreatTok | GreatEqTok | EqTok | EqBoolTok |TrueTok | FalseTok deriving (Show, Eq)
+           | LessEqTok | EqTok | EqBoolTok | TrueTok | FalseTok deriving (Show, Eq)
            
 
 -- Auxiliar functions that splits the input string into a list of strings (tokens)
@@ -549,9 +578,6 @@ lexer (c:t) = case c of
   '-' -> MinusTok : lexer t
   '*' -> MultTok : lexer t
   '<' | t /= [] && take 1 t == "=" -> LessEqTok : lexer (drop 1 t)
-      | otherwise -> LessTok : lexer t
-  '>' | t /= [] && take 1 t == "=" -> GreatEqTok : lexer (drop 1 t)
-      | otherwise -> GreatTok : lexer t
   '=' | t /= [] && take 1 t == "=" -> EqTok : lexer (drop 1 t)
       | otherwise -> EqBoolTok : lexer t
   ':' | t /= [] && take 1 t == "=" -> AssignTok : lexer (drop 1 t)
@@ -564,7 +590,6 @@ lexer (c:t) = case c of
   'w' | t /= [] && take 4 t == "hile" -> WhileTok : lexer (drop 4 t)
   'd' | t /= [] && take 2 t == "do" -> DoTok : lexer (drop 2 t)
   _   | isAlpha c && isLower c -> let (var, rest) = span isAlphaNum (c:t) in VarTok var : lexer rest
---      | isAlpha c && isUpper c -> let (var, rest) = span isAlphaNum (c:t) in lexer rest
       | isDigit c -> let (num, rest) = span isDigit (c:t) in NumTok (fromIntegral (stringToInt num)) : lexer rest
       | otherwise -> lexer t
 
