@@ -37,7 +37,7 @@ testAssembler code = (stack2Str stack, state2Str state)
 -- testAssembler [Push (-20),Tru,Fals] == ("False,True,-20","")
 -- testAssembler [Push (-20),Tru,Tru,Neg] == ("False,True,-20","")
 -- testAssembler [Push (-20),Tru,Tru,Neg,Equ] == ("False,-20","")
--- testAssembler [Push (-20),Push (-21), Le] == ("True","")
+-- testAssembler [Push (-20),Push (-21), Le] == ("True"," if x <= 43")
 -- testAssembler [Push 5,Store "x",Push 1,Fetch "x",Sub,Store "x"] == ("","x=4")
 -- testAssembler [Push 10,Store "i",Push 1,Store "fact",Loop [Push 1,Fetch "i",Equ,Neg] [Fetch "i",Fetch "fact",Mult,Store "fact",Push 1,Fetch "i",Sub,Store "i"]] == ("","fact=3628800,i=1")
 -- If you test:
