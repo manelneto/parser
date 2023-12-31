@@ -288,7 +288,7 @@ compB expB = case expB of
   NegB exp -> compB exp ++ [Neg]
 
 
--- Compiles a program
+-- Compiles a program Using the functions compA and compB auxiliary functions
 compile :: Program -> Code
 compile [] = []
 compile (h:t) = case h of
@@ -296,23 +296,36 @@ compile (h:t) = case h of
   If expB s1 s2 -> compB expB ++ [Branch (compile s1) (compile s2)] ++ compile t
   While expB s -> Loop (compB expB) (compile s) : compile t
 
--- uses the parseAux function to get the program
+-- Returns a program from a string using the lexer and an auxiliary function.
 parse :: String -> Program
 parse input = parseAux (lexer input)
 
+
+-- Recursive function that parses a list of tokens into a program
 parseAux :: [Token] -> Program
 parseAux [] = []
-parseAux tokens = case parseAssign (head instruction) of
-  Just (assignStm, []) -> assignStm : parseAux (last instruction)
-  _ ->  case parseIfThenElse (head instruction) (instruction !! 1) (instruction !! 2) of
-      Just (ifStm, []) -> ifStm : parseAux (last instruction)
-      _ -> case parseWhile (head instruction) (instruction !! 1) of
-        Just (whileStm, []) -> whileStm : parseAux (last instruction)
+parseAux tokens =
+  case instruction of
+    [tok1, tok2] ->
+      case parseAssign tok1 of
+        Just (assignStm, []) -> assignStm : parseAux tok2
         _ -> error "Parse error"
-  where instruction = getInstructions tokens
 
+    [tok1, tok2, tok3] ->
+      case parseWhile tok1 tok2 of
+        Just (whileStm, []) -> whileStm : parseAux tok3
+        _ -> error "Parse error"
 
+    [tok1, tok2, tok3, tok4] ->
+      case parseIfThenElse tok1 tok2 tok3 of
+        Just (ifStm, []) -> ifStm : parseAux tok4
+        _ -> error "Parse error"
 
+    _ -> error "Invalid instruction length"
+  where
+    instruction = getInstructions tokens
+
+-- Returns a list of tokens that represents a single instruction and the rest of the tokens still to be parsed
 getInstructions :: [Token] -> [[Token]]
 getInstructions (left : AssignTok : restTokens) = [left : AssignTok : (takeWhile (/= SepTok) restTokens), drop 1 (dropWhile (/= SepTok) restTokens)]
 getInstructions (WhileTok : restTokens) = [afterWhile,afterDo, resto] where 
@@ -332,6 +345,10 @@ getInstructions (IfTok : restTokens) = [afterIf, afterThen, afterElse, resto]
   resto = snd thdSep; 
 getInstructions (OpenTok : restTokens) = getInstructions (init restTokens)
 
+
+-- Splits a list of tokens into two lists of tokens,
+-- the first one containing the tokens before the first ocurrence of the given token regarding parenthesis,
+-- and the second one containing the tokens after that ocurrence of the token.
 splitOnToken :: Token -> [Token] -> ([Token], [Token])
 splitOnToken token list = split list 0 []
   where
@@ -342,13 +359,19 @@ splitOnToken token list = split list 0 []
       | x == CloseTok = split xs (count - 1) (x:acc)
       | otherwise = split xs count (x:acc)
 
-
+-- Parses an assignment instruction
+-- Returns a tuple with the assignment statement and the rest of the tokens still to be parsed
+-- If the tokens do not represent a valid assignment, returns Nothing
 parseAssign :: [Token] -> Maybe (Stm, [Token])
 parseAssign (VarTok varName : AssignTok : restTokens) = case parseAexp restTokens of 
   Just (varValue, _) -> Just (Assign varName varValue, []) 
   Nothing -> Nothing
 parseAssign _ = Nothing
 
+
+-- Parses an if-then-else instruction
+-- Returns a tuple with the if-then-else statement and the rest of the tokens still to be parsed
+-- If the tokens do not represent a valid if-then-else, returns Nothing
 parseIfThenElse :: [Token] -> [Token] -> [Token] -> Maybe (Stm, [Token])
 parseIfThenElse tokens1 tokens2 tokens3 = case parseBexp tokens1 of
   Just (condition, _) -> case parseAux tokens2 of
@@ -358,6 +381,10 @@ parseIfThenElse tokens1 tokens2 tokens3 = case parseBexp tokens1 of
       elseStm -> Just (If condition thenStm elseStm, []) 
   _ -> Nothing 
 
+
+-- Parses a while instruction
+-- Returns a tuple with the while statement and the rest of the tokens still to be parsed
+-- If the tokens do not represent a valid while, returns Nothing
 parseWhile :: [Token] -> [Token] -> Maybe (Stm, [Token])
 parseWhile tokens1 tokens2 = case parseBexp tokens1 of
   Just (condition, _) -> case parseAux tokens2 of 
@@ -366,7 +393,9 @@ parseWhile tokens1 tokens2 = case parseBexp tokens1 of
   _ -> Nothing
 
 
-
+-- Parses a sum or subtraction expression
+-- Returns a tuple with the Sum/Subtraction expression and the rest of the tokens still to be parsed
+-- If the tokens do not represent a valid sum or subtraction expression, returns Nothing
 
 parseAexp :: [Token] -> Maybe (Aexp, [Token])
 parseAexp tokens = case parseMultIntPar tokens of
@@ -379,6 +408,9 @@ parseAexp tokens = case parseMultIntPar tokens of
   result -> result
 
 
+-- Parses a multiplication expression
+-- Returns a tuple with the Multiplication expression and the rest of the tokens still to be parsed
+-- If the tokens do not represent a valid multiplication expression, returns Nothing
 parseMultIntPar :: [Token] -> Maybe (Aexp, [Token])
 parseMultIntPar tokens = case parseIntPar tokens of 
   Just (expr1, (MultTok : restTokens1)) -> case parseMultIntPar restTokens1 of
@@ -386,7 +418,9 @@ parseMultIntPar tokens = case parseIntPar tokens of
     Nothing -> Nothing
   result -> result
 
-
+-- Parses an integer, variable expression or a parenthesis expression
+-- Returns a tuple with the Integer or Variable expression and the rest of the tokens still to be parsed
+-- If the tokens do not represent a valid integer or variable expression, returns Nothing
 parseIntPar :: [Token] -> Maybe (Aexp, [Token])
 parseIntPar (NumTok n : restTokens) = Just (Num n, restTokens)
 parseIntPar (VarTok var : restTokens) = Just (NumVar var, restTokens)
@@ -396,7 +430,9 @@ parseIntPar (OpenTok : restTokens1) = case parseAexp restTokens1 of
 parseIntPar tokens = Nothing
 
 
-
+-- Parses a boolean expression
+-- Returns a tuple with the boolean expression and the rest of the tokens still to be parsed
+-- If the tokens do not represent a valid boolean expression, returns Nothing
 parseBexp :: [Token] -> Maybe (Bexp, [Token])
 parseBexp tokens = case parseEqBNegEqALeBoolPar tokens of
   Just (expr1, (AndTok : restTokens1)) -> case parseBexp restTokens1 of
@@ -404,7 +440,9 @@ parseBexp tokens = case parseEqBNegEqALeBoolPar tokens of
     Nothing -> Nothing
   result -> result
 
-
+-- Parses a boolean equality expression
+-- Returns a tuple with the boolean equality expression and the rest of the tokens still to be parsed
+-- If the tokens do not represent a valid boolean equality expression, returns Nothing
 parseEqBNegEqALeBoolPar :: [Token] -> Maybe (Bexp, [Token])
 parseEqBNegEqALeBoolPar tokens = case parseNegEqALeBoolPar tokens of
   Just (expr1, (EqBoolTok : restTokens1)) -> case parseEqALeBoolPar restTokens1 of
@@ -412,12 +450,18 @@ parseEqBNegEqALeBoolPar tokens = case parseNegEqALeBoolPar tokens of
     Nothing -> Nothing
   result -> result
 
+-- Parses a boolean negation expression
+-- Returns a tuple with the boolean negation expression and the rest of the tokens still to be parsed
+-- If the tokens do not represent a valid boolean negation expression, returns Nothing
 parseNegEqALeBoolPar :: [Token] -> Maybe (Bexp, [Token])
 parseNegEqALeBoolPar (NotTok:restTokens) = case parseEqALeBoolPar restTokens of
   Just (expr,restTokens2) -> Just (NegB expr, restTokens2)
   result -> result
 parseNegEqALeBoolPar tokens = parseEqALeBoolPar tokens
 
+-- Parses an arithmetic equality expression
+-- Returns a tuple with the arithmetic equality expression and the rest of the tokens still to be parsed
+-- If the tokens do not represent a valid arithmetic equality expression, returns Nothing
 parseEqALeBoolPar :: [Token] -> Maybe (Bexp, [Token])
 parseEqALeBoolPar tokens = case parseAexp tokens of
   Just (expr1, (EqTok : restTokens1)) -> case parseAexp restTokens1 of
@@ -425,6 +469,9 @@ parseEqALeBoolPar tokens = case parseAexp tokens of
     Nothing -> Nothing
   _ -> parseLeBoolPar tokens
 
+-- Parses an arithmetic less or equal expression
+-- Returns a tuple with the arithmetic less or equal expression and the rest of the tokens still to be parsed
+-- If the tokens do not represent a valid arithmetic less or equal expression, returns Nothing
 parseLeBoolPar :: [Token] -> Maybe (Bexp, [Token])
 parseLeBoolPar tokens = case parseAexp tokens of
   Just (expr1, (LessEqTok : restTokens1)) -> case parseAexp restTokens1 of
@@ -432,6 +479,9 @@ parseLeBoolPar tokens = case parseAexp tokens of
     Nothing -> Nothing
   _ -> parseBoolPar tokens
 
+-- Parses a boolean expression between parenthesis
+-- Returns a tuple with the boolean expression and the rest of the tokens still to be parsed
+-- If the tokens do not represent a valid boolean expression between parenthesis, returns Nothing
 parseBoolPar :: [Token] -> Maybe (Bexp, [Token])
 parseBoolPar (TrueTok : restTokens) = Just (Bool True, restTokens)
 parseBoolPar (FalseTok : restTokens) = Just (Bool False, restTokens)
