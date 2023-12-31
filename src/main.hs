@@ -304,9 +304,11 @@ parseAux :: [Token] -> Program
 parseAux [] = []
 parseAux tokens = case parseAssign (head instruction) of
   Just (assignStm, []) -> assignStm : parseAux (last instruction)
-  _ -> case parseWhile (head instruction) (instruction !! 1) of
-    Just (whileStm, []) -> whileStm : parseAux (last instruction)
-    _ -> error "Parse error"
+  _ ->  case parseIfThenElse (head instruction) (instruction !! 1) (instruction !! 2) of
+      Just (ifStm, []) -> ifStm : parseAux (last instruction)
+      _ -> case parseWhile (head instruction) (instruction !! 1) of
+        Just (whileStm, []) -> whileStm : parseAux (last instruction)
+        _ -> error "Parse error"
   where instruction = getInstructions tokens
 
 
@@ -316,8 +318,18 @@ getInstructions (left : AssignTok : restTokens) = [left : AssignTok : (takeWhile
 getInstructions (WhileTok : restTokens) = [afterWhile,afterDo, resto] where 
   firstSep = splitOnToken DoTok restTokens;
   afterWhile = fst firstSep;
-  afterDo = fst (splitOnToken SepTok (snd firstSep));
-  resto = snd (splitOnToken SepTok (snd firstSep));
+  sndSep = splitOnToken SepTok (snd firstSep);
+  afterDo = fst sndSep;
+  resto = snd sndSep;
+getInstructions (IfTok : restTokens) = [afterIf, afterThen, afterElse, resto]
+  where
+  firstSep = splitOnToken ThenTok restTokens;
+  afterIf = fst firstSep;
+  sndSep = splitOnToken ElseTok (snd firstSep);
+  afterThen = fst sndSep;
+  thdSep = splitOnToken SepTok (snd sndSep);
+  afterElse = fst thdSep;
+  resto = snd thdSep; 
 getInstructions (OpenTok : restTokens) = getInstructions (init restTokens)
 
 splitOnToken :: Token -> [Token] -> ([Token], [Token])
@@ -340,18 +352,18 @@ parseAssign _ = Nothing
 parseIfThenElse :: [Token] -> [Token] -> [Token] -> Maybe (Stm, [Token])
 parseIfThenElse tokens1 tokens2 tokens3 = case parseBexp tokens1 of
   Just (condition, _) -> case parseAux tokens2 of
-    [] -> Nothing
+    [] -> Nothing 
     thenStm -> case parseAux tokens3 of
       [] -> Nothing
-      elseStm -> Just (If condition thenStm elseStm, [])
-  _ -> Nothing
+      elseStm -> Just (If condition thenStm elseStm, []) 
+  _ -> Nothing 
 
 parseWhile :: [Token] -> [Token] -> Maybe (Stm, [Token])
 parseWhile tokens1 tokens2 = case parseBexp tokens1 of
   Just (condition, _) -> case parseAux tokens2 of 
     [] -> Nothing
     whileStm -> Just (While condition whileStm, []) 
-  _ -> Nothing `debug` show tokens1
+  _ -> Nothing
 
 
 
@@ -611,6 +623,7 @@ lexer (c:t) = case c of
   'e' | t /= [] && take 3 t == "lse" -> ElseTok : lexer (drop 3 t)
   'w' | t /= [] && take 4 t == "hile" -> WhileTok : lexer (drop 4 t)
   'd' | t /= [] && take 1 t == "o" -> DoTok : lexer (drop 1 t)
+  'a' | t /= [] && take 2 t == "nd" -> AndTok : lexer (drop 2 t)
   _   | isAlpha c && isLower c -> let (var, rest) = span isAlphaNum (c:t) in VarTok var : lexer rest
       | isDigit c -> let (num, rest) = span isDigit (c:t) in NumTok (fromIntegral (stringToInt num)) : lexer rest
       | otherwise -> lexer t
