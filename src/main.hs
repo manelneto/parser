@@ -302,10 +302,34 @@ parse input = parseAux (lexer input)
 
 parseAux :: [Token] -> Program
 parseAux [] = []
-parseAux tokens = case parseAssign instruction of
-  Just (assignStm, []) -> assignStm : parseAux (drop 1 (dropWhile (/= SepTok) tokens))
-  _ -> error "Parse error"
-  where instruction = takeWhile (/= SepTok) tokens
+parseAux tokens = case parseAssign (head instruction) of
+  Just (assignStm, []) -> assignStm : parseAux (last instruction)
+  _ -> case parseWhile (head instruction) (instruction !! 1) of
+    Just (whileStm, []) -> whileStm : parseAux (last instruction)
+    _ -> error "Parse error"
+  where instruction = getInstructions tokens
+
+
+
+getInstructions :: [Token] -> [[Token]]
+getInstructions (left : AssignTok : restTokens) = [left : AssignTok : (takeWhile (/= SepTok) restTokens), drop 1 (dropWhile (/= SepTok) restTokens)]
+getInstructions (WhileTok : restTokens) = [afterWhile,afterDo, resto] where 
+  firstSep = splitOnToken DoTok restTokens;
+  afterWhile = fst firstSep;
+  afterDo = fst (splitOnToken SepTok (snd firstSep));
+  resto = snd (splitOnToken SepTok (snd firstSep));
+getInstructions (OpenTok : restTokens) = getInstructions (init restTokens)
+
+splitOnToken :: Token -> [Token] -> ([Token], [Token])
+splitOnToken token list = split list 0 []
+  where
+    split [] _ acc = (reverse acc, [])
+    split (x:xs) count acc
+      | x == token && count == 0 = (reverse acc, xs)
+      | x == OpenTok = split xs (count + 1) (x:acc)
+      | x == CloseTok = split xs (count - 1) (x:acc)
+      | otherwise = split xs count (x:acc)
+
 
 parseAssign :: [Token] -> Maybe (Stm, [Token])
 parseAssign (VarTok varName : AssignTok : restTokens) = case parseAexp restTokens of 
@@ -321,6 +345,14 @@ parseIfThenElse tokens1 tokens2 tokens3 = case parseBexp tokens1 of
       [] -> Nothing
       elseStm -> Just (If condition thenStm elseStm, [])
   _ -> Nothing
+
+parseWhile :: [Token] -> [Token] -> Maybe (Stm, [Token])
+parseWhile tokens1 tokens2 = case parseBexp tokens1 of
+  Just (condition, _) -> case parseAux tokens2 of 
+    [] -> Nothing
+    whileStm -> Just (While condition whileStm, []) 
+  _ -> Nothing `debug` show tokens1
+
 
 
 
@@ -369,25 +401,24 @@ parseEqBNegEqALeBoolPar tokens = case parseNegEqALeBoolPar tokens of
   result -> result
 
 parseNegEqALeBoolPar :: [Token] -> Maybe (Bexp, [Token])
-parseNegEqALeBoolPar tokens = case parseEqALeBoolPar tokens of
-  Just (expr,(NotTok : restTokens)) -> Just (NegB expr, restTokens)
+parseNegEqALeBoolPar (NotTok:restTokens) = case parseEqALeBoolPar restTokens of
+  Just (expr,restTokens2) -> Just (NegB expr, restTokens2)
   result -> result
+parseNegEqALeBoolPar tokens = parseEqALeBoolPar tokens
 
 parseEqALeBoolPar :: [Token] -> Maybe (Bexp, [Token])
 parseEqALeBoolPar tokens = case parseAexp tokens of
   Just (expr1, (EqTok : restTokens1)) -> case parseAexp restTokens1 of
     Just (expr2, restTokens2) -> Just (EqA expr1 expr2, restTokens2)
     Nothing -> Nothing
-  Just (_, _) -> parseLeBoolPar tokens
-  _ -> Nothing
+  _ -> parseLeBoolPar tokens
 
 parseLeBoolPar :: [Token] -> Maybe (Bexp, [Token])
 parseLeBoolPar tokens = case parseAexp tokens of
   Just (expr1, (LessEqTok : restTokens1)) -> case parseAexp restTokens1 of
     Just (expr2, restTokens2) -> Just (LeA expr1 expr2, restTokens2)
     Nothing -> Nothing
-  Just (_, _) -> parseBoolPar tokens
-  _ -> Nothing
+  _ -> parseBoolPar tokens
 
 parseBoolPar :: [Token] -> Maybe (Bexp, [Token])
 parseBoolPar (TrueTok : restTokens) = Just (Bool True, restTokens)
@@ -579,7 +610,7 @@ lexer (c:t) = case c of
   't' | t /= [] && take 3 t == "hen" -> ThenTok : lexer (drop 3 t)
   'e' | t /= [] && take 3 t == "lse" -> ElseTok : lexer (drop 3 t)
   'w' | t /= [] && take 4 t == "hile" -> WhileTok : lexer (drop 4 t)
-  'd' | t /= [] && take 2 t == "do" -> DoTok : lexer (drop 2 t)
+  'd' | t /= [] && take 1 t == "o" -> DoTok : lexer (drop 1 t)
   _   | isAlpha c && isLower c -> let (var, rest) = span isAlphaNum (c:t) in VarTok var : lexer rest
       | isDigit c -> let (num, rest) = span isDigit (c:t) in NumTok (fromIntegral (stringToInt num)) : lexer rest
       | otherwise -> lexer t
