@@ -1,6 +1,6 @@
-import Data.Map (Map, fromList, toList, (!), member, insert, empty, lookup)
-import Data.List (sort, intercalate)
-import Data.Char (isAlpha, isAlphaNum, isUpper, isLower, isDigit, digitToInt)
+import Data.Map (Map, toList, insert, empty, lookup)
+import Data.List (intercalate)
+import Data.Char (isAlpha, isAlphaNum, isLower, isDigit, digitToInt)
 
 
 data Inst =
@@ -25,26 +25,26 @@ createEmptyStack = []
 createEmptyState :: State 
 createEmptyState = empty
 
+
+-- Shows a value that can be either an Integer or a Bool
+showValue :: Either Integer Bool -> String
+showValue (Left intVal) = show intVal
+showValue (Right boolVal) = show boolVal
+
 -- Returns the string representation of a stack in the form "x,y,z", where x is the top of the stack
 stack2Str :: Stack -> String
 stack2Str [] = ""
 stack2Str (h:t)
-  | null t = case h of
-      Left x -> show x ++ stack2Str t
-      Right x -> show x ++ stack2Str t
-  | otherwise = case h of
-      Left x -> show x ++ "," ++ stack2Str t
-      Right x -> show x ++ "," ++ stack2Str t 
-  
+  | null t = showValue h ++ stack2Str t
+  | otherwise = showValue h ++ "," ++ stack2Str t
+
 -- Returns the string representation of a state in the form "x=1,y=False,z=2", 
 -- where x, y and z are the variables in the state, ordered alphabetically
 state2Str :: State -> String
 state2Str state = case toList state of
   [] -> ""
-  lst -> intercalate "," $ map (\(x, y) -> x ++ "=" ++ showValue y) lst  where
-    showValue :: Either Integer Bool -> String
-    showValue (Left intVal) = show intVal
-    showValue (Right boolVal) = show boolVal
+  lst -> intercalate "," $ map (\(x, y) -> x ++ "=" ++ showValue y) lst
+
 
 -- Runs a list of instructions, returning as output an empty code list,
 -- a stack and the output values in the storage
@@ -60,7 +60,7 @@ run (h:t, stack, state) = case h of
   Tru -> run (t, true stack, state)
   Fals -> run (t, false stack, state)
   Fetch x -> run (t, fetch x stack state, state)
-  Store x -> run (t, fst stackState, snd stackState) where  stackState = store x stack state
+  Store x -> run (t, fst stackState, snd stackState) where stackState = store x stack state
   Branch c1 c2 -> run (c ++ t, s, state) where (c, s) = branch c1 c2 stack  
   Noop -> run (t, stack, state)
   Loop c1 c2 -> run(c ++ t, stack, state) where c = loop c1 c2
@@ -70,55 +70,50 @@ run (h:t, stack, state) = case h of
 
 -- Instructions
 
--- Adds the top two integer values of the stack, respectively, 
+-- Adds the top two integer values of the stack,
 -- and pushes the result onto the top of the stack
 add :: Stack -> Stack
-add [] = error "Run-time error"
-add [x] = error "Run-time error"
 add (x:y:t) = case (x, y) of
   (Left x, Left y) -> Left (x + y):t
   _ -> error "Run-time error"
+add _ = error "Run-time error"
 
 
--- Multiplies the top two integer values of the stack, respectively,
+-- Multiplies the top two integer values of the stack,
 -- and pushes the result onto the top of the stack
 mult :: Stack -> Stack
-mult [] = error "Run-time error"
-mult [x] = error "Run-time error"
 mult (x:y:t) = case (x, y) of
   (Left x, Left y) -> Left (x * y):t
   _ -> error "Run-time error"
+mult _ = error "Run-time error"
 
 
 -- Subtracts the topmost element of the stack with the second topmost element,
 -- and pushes the result onto the top of the stack
 sub :: Stack -> Stack
-sub [] = error "Run-time error"
-sub [x] = error "Run-time error"
 sub (x:y:t) = case (x, y) of
   (Left x, Left y) -> Left (x - y):t
   _ -> error "Run-time error"
+sub _ = error "Run-time error"
 
 
 -- Compares the top two values of the stack for equality,
 -- and pushes a boolean with the comparison result onto the top of the stack
 eq :: Stack -> Stack
-eq [] = error "Run-time error"
-eq [x] = error "Run-time error"
 eq (x:y:t) = case (x, y) of
   (Left x, Left y) -> Right (x == y):t
   (Right x, Right y) -> Right (x == y):t
   _ -> error "Run-time error"
+eq _ = error "Run-time error"
 
 
--- Determines whether the topmost stack element is less or equal to the second topmost element,
+-- Determines whether the topmost stack element is less than or equal to the second topmost element,
 -- and pushes a boolean with the comparison result onto the top of the stack
 le :: Stack -> Stack
-le [] = error "Run-time error"
-le [x] = error "Run-time error"
 le (x:y:t) = case (x, y) of
   (Left x, Left y) -> Right (x <= y):t
   _ -> error "Run-time error"
+le _ = error "Run-time error"
 
 
 -- Pushes an integer onto the top of the stack
@@ -136,7 +131,7 @@ false :: Stack -> Stack
 false s = Right False:s
 
 
--- Pushes the value bound to x onto the top of the stack.
+-- Pushes the value bound to x onto the top of the stack
 -- If x is not bound, raises a run-time error
 fetch :: String -> Stack -> State -> Stack
 fetch x s state = case Data.Map.lookup x state of
@@ -147,17 +142,16 @@ fetch x s state = case Data.Map.lookup x state of
 
 
 -- Pops the topmost element of the stack,
--- and updates the storage so that the popped value is bound to x.
+-- and updates the storage so that the popped value is bound to x
 store :: String -> Stack -> State -> (Stack, State)
 store x [] state = error "Run-time error"
-store x (h:t) state = 
-    (t, insert x h state)
+store x (h:t) state = (t, insert x h state)
 
 
 -- If the top of the stack is the value True, 
--- the stack is popped and c1 is to be executed next.
+-- the stack is popped and c1 is to be executed next
 -- Otherwise, if the top element of the stack is the value False,
--- then it will be popped and c2 will be executed next.
+-- then it will be popped and c2 will be executed next
 branch :: Code -> Code -> Stack -> (Code, Stack)
 branch c1 c2 [] = error "Run-time error"
 branch c1 c2 (h:t) = case h of
@@ -167,8 +161,7 @@ branch c1 c2 (h:t) = case h of
 
 
 -- Writes c1 to the beggining of the code list,
--- followed by a branch instruction that executes c2 followed by the loop instruction itself.
--- or a Noop 
+-- followed by a branch instruction that executes c2 followed by the loop instruction itself or a Noop 
 loop :: Code -> Code -> Code
 loop c1 c2 = c1 ++ [Branch (c2 ++ [Loop c1 c2]) [Noop]]
 
@@ -182,18 +175,18 @@ neg (h:t) = case h of
   _ -> error "Run-time error"
 
 
--- Pops the two top values of the stack,
+-- Pops the top two values of the stack,
 -- and pushes the result of the logical operation AND between them if they are both booleans
 myAnd :: Stack -> Stack
-myAnd [] = error "Run-time error"
-myAnd [x] = error "Run-time error"
 myAnd (x:y:t) = case (x, y) of
   (Right x, Right y) -> Right (x && y):t
   _ -> error "Run-time error"
+myAnd _ = error "Run-time error"
+
 
 
 -- Aexp is an arithmetic expression
-data Aexp = Num Integer | NumVar String | AddA Aexp Aexp | SubA Aexp Aexp | MultA Aexp Aexp deriving Show
+data Aexp = Num Integer | Var String | AddA Aexp Aexp | SubA Aexp Aexp | MultA Aexp Aexp deriving Show
 
 -- Bexp is a boolean expression
 data Bexp = Bool Bool | EqA Aexp Aexp | LeA Aexp Aexp | EqB Bexp Bexp | AndB Bexp Bexp | NegB Bexp deriving Show
@@ -204,7 +197,8 @@ data Stm = Assign String Aexp | If Bexp [Stm] [Stm] | While Bexp [Stm] deriving 
 -- Program is a list of statements
 type Program = [Stm]
 
--- Compiles a program Using the functions compA and compB auxiliary functions
+
+-- Compiles a program using the auxiliary functions compA and compB
 compile :: Program -> Code
 compile [] = []
 compile (h:t) = case h of
@@ -217,7 +211,7 @@ compile (h:t) = case h of
 compA :: Aexp -> Code
 compA expA = case expA of
   Num num -> [Push num]
-  NumVar var -> [Fetch var]
+  Var var -> [Fetch var]
   AddA left right -> compA right ++ compA left ++ [Add]
   SubA left right -> compA right ++ compA left ++ [Sub]
   MultA left right -> compA right ++ compA left ++ [Mult]
@@ -350,13 +344,12 @@ parseWhile tokens1 tokens2 = case parseBexp tokens1 of
 -- Parses a sum or subtraction expression
 -- Returns a tuple with the Sum/Subtraction expression and the rest of the tokens still to be parsed
 -- If the tokens do not represent a valid sum or subtraction expression, returns Nothing
-
 parseAexp :: [Token] -> Maybe (Aexp, [Token])
 parseAexp tokens = case parseMultIntPar tokens of
-  Just (expr1, (PlusTok : restTokens1)) -> case parseMultIntPar restTokens1 of
+  Just (expr1, PlusTok : restTokens1) -> case parseMultIntPar restTokens1 of
     Just (expr2, restTokens2) -> Just (AddA expr1 expr2, restTokens2)
     Nothing -> Nothing
-  Just (expr1, (MinusTok : restTokens1)) -> case parseMultIntPar restTokens1 of
+  Just (expr1, MinusTok : restTokens1) -> case parseMultIntPar restTokens1 of
     Just (expr2, restTokens2) -> Just (SubA expr1 expr2, restTokens2)
     Nothing -> Nothing
   result -> result
@@ -366,7 +359,7 @@ parseAexp tokens = case parseMultIntPar tokens of
 -- If the tokens do not represent a valid multiplication expression, returns Nothing
 parseMultIntPar :: [Token] -> Maybe (Aexp, [Token])
 parseMultIntPar tokens = case parseIntPar tokens of 
-  Just (expr1, (MultTok : restTokens1)) -> case parseMultIntPar restTokens1 of
+  Just (expr1, MultTok : restTokens1) -> case parseMultIntPar restTokens1 of
     Just (expr2, restTokens2) -> Just (MultA expr1 expr2, restTokens2)
     Nothing -> Nothing
   result -> result
@@ -376,9 +369,9 @@ parseMultIntPar tokens = case parseIntPar tokens of
 -- If the tokens do not represent a valid integer or variable expression, returns Nothing
 parseIntPar :: [Token] -> Maybe (Aexp, [Token])
 parseIntPar (NumTok n : restTokens) = Just (Num n, restTokens)
-parseIntPar (VarTok var : restTokens) = Just (NumVar var, restTokens)
+parseIntPar (VarTok var : restTokens) = Just (Var var, restTokens)
 parseIntPar (OpenTok : restTokens1) = case parseAexp restTokens1 of
-  Just (expr, (CloseTok : restTokens2)) -> Just (expr, restTokens2)
+  Just (expr, CloseTok : restTokens2) -> Just (expr, restTokens2)
   _ -> Nothing
 parseIntPar tokens = Nothing
 
@@ -393,7 +386,7 @@ parseIntPar tokens = Nothing
 -- If the tokens do not represent a valid boolean expression, returns Nothing
 parseBexp :: [Token] -> Maybe (Bexp, [Token])
 parseBexp tokens = case parseEqBNegEqALeBoolPar tokens of
-  Just (expr1, (AndTok : restTokens1)) -> case parseBexp restTokens1 of
+  Just (expr1, AndTok : restTokens1) -> case parseBexp restTokens1 of
     Just (expr2, restTokens2) -> Just (AndB expr1 expr2, restTokens2)
     Nothing -> Nothing
   result -> result
@@ -403,7 +396,7 @@ parseBexp tokens = case parseEqBNegEqALeBoolPar tokens of
 -- If the tokens do not represent a valid boolean equality expression, returns Nothing
 parseEqBNegEqALeBoolPar :: [Token] -> Maybe (Bexp, [Token])
 parseEqBNegEqALeBoolPar tokens = case parseNegEqALeBoolPar tokens of
-  Just (expr1, (EqBoolTok : restTokens1)) -> case parseEqALeBoolPar restTokens1 of
+  Just (expr1, EqBoolTok : restTokens1) -> case parseEqALeBoolPar restTokens1 of
     Just (expr2, restTokens2) -> Just (EqB expr1 expr2, restTokens2)
     Nothing -> Nothing
   result -> result
@@ -422,7 +415,7 @@ parseNegEqALeBoolPar tokens = parseEqALeBoolPar tokens
 -- If the tokens do not represent a valid arithmetic equality expression, returns Nothing
 parseEqALeBoolPar :: [Token] -> Maybe (Bexp, [Token])
 parseEqALeBoolPar tokens = case parseAexp tokens of
-  Just (expr1, (EqTok : restTokens1)) -> case parseAexp restTokens1 of
+  Just (expr1, EqTok : restTokens1) -> case parseAexp restTokens1 of
     Just (expr2, restTokens2) -> Just (EqA expr1 expr2, restTokens2)
     Nothing -> Nothing
   _ -> parseLeBoolPar tokens
@@ -432,7 +425,7 @@ parseEqALeBoolPar tokens = case parseAexp tokens of
 -- If the tokens do not represent a valid arithmetic less or equal expression, returns Nothing
 parseLeBoolPar :: [Token] -> Maybe (Bexp, [Token])
 parseLeBoolPar tokens = case parseAexp tokens of
-  Just (expr1, (LessEqTok : restTokens1)) -> case parseAexp restTokens1 of
+  Just (expr1, LessEqTok : restTokens1) -> case parseAexp restTokens1 of
     Just (expr2, restTokens2) -> Just (LeA expr1 expr2, restTokens2)
     Nothing -> Nothing
   _ -> parseBoolPar tokens
@@ -444,14 +437,13 @@ parseBoolPar :: [Token] -> Maybe (Bexp, [Token])
 parseBoolPar (TrueTok : restTokens) = Just (Bool True, restTokens)
 parseBoolPar (FalseTok : restTokens) = Just (Bool False, restTokens)
 parseBoolPar (OpenTok : restTokens1) = case parseBexp restTokens1 of
-  Just (exp, (CloseTok : restTokens2)) -> Just (exp, restTokens2)
+  Just (exp, CloseTok : restTokens2) -> Just (exp, restTokens2)
   _ -> Nothing
 parseBoolPar _ = Nothing
 
 
 -- Auxiliar functions that splits the input string into a list of tokens (strings)
 -- Ignores words started by uppercase letters
-
 lexer :: String -> [Token]
 lexer [] = []
 lexer (c:t) = case c of
@@ -480,7 +472,6 @@ lexer (c:t) = case c of
       | otherwise -> lexer t
 
 -- Auxiliar function to convert a string into an integer
-
 stringToInt :: String -> Int
 stringToInt=foldl (\acc chr->10*acc+digitToInt chr) 0
 
@@ -611,25 +602,25 @@ correct1 = [Push 10, Store "x"]
 
 -- Exemplo de sequência de comandos: x := 5; y := x + 3;
 program2 :: Program
-program2 = [Assign "x" (Num 5), Assign "y" (AddA (NumVar "x") (Num 3))]
+program2 = [Assign "x" (Num 5), Assign "y" (AddA (Var "x") (Num 3))]
 correct2 :: Code
 correct2 = [Push 5, Store "x", Push 3, Fetch "x", Add, Store "y"]
 
 -- Exemplo de condicional: if x = 0 then y := 1 else y := 2;
 program3 :: Program
-program3 = [If (EqA (NumVar "x") (Num 0)) [Assign "y" (Num 1)] [Assign "y" (Num 2)]]
+program3 = [If (EqA (Var "x") (Num 0)) [Assign "y" (Num 1)] [Assign "y" (Num 2)]]
 correct3 :: Code
 correct3 = [Push 0, Fetch "x", Equ, Branch [Push 1, Store "y"] [Push 2, Store "y"]]
 
 -- Exemplo de while loop: while x > 0 do x := x - 1;
 program4 :: Program
-program4 = [While (NegB (LeA (NumVar "x") (Num 0))) [Assign "x" (SubA (NumVar "x") (Num 1))]]
+program4 = [While (NegB (LeA (Var "x") (Num 0))) [Assign "x" (SubA (Var "x") (Num 1))]]
 correct4 :: Code
 correct4 = [Loop [Push 0, Fetch "x", Le, Neg] [Push 1, Fetch "x", Sub, Store "x"]]
 
 -- Exemplo de while loop: while x != 0 do x := x - 1;
 program5 :: Program
-program5 = [Assign "x" (Num 10),While (NegB (EqA (NumVar "x") (Num 0))) [Assign "x" (SubA (NumVar "x") (Num 1))]]
+program5 = [Assign "x" (Num 10),While (NegB (EqA (Var "x") (Num 0))) [Assign "x" (SubA (Var "x") (Num 1))]]
 
 -- x = 1
 assignment :: Program
@@ -639,7 +630,7 @@ assignment' = [Push 1, Store "x"]
 
 -- x = 1; y = x + 2
 addition :: Program
-addition = [Assign "x" (Num 1), Assign "y" (AddA (NumVar "x") (Num 2))]
+addition = [Assign "x" (Num 1), Assign "y" (AddA (Var "x") (Num 2))]
 addition' :: Code
 addition' = [Push 1, Store "x", Push 2, Fetch "x", Add, Store "y"]
 
@@ -647,7 +638,7 @@ addition' = [Push 1, Store "x", Push 2, Fetch "x", Add, Store "y"]
 -- ! VEJAM ESTE EXEMPLO DO PDF
 -- y = 1; while (x != 1) do (y = y * x; x = x - 1)
 factorial :: Program
-factorial = [Assign "y" (Num 1), While (NegB (EqA (NumVar "x") (Num 1))) [Assign "y" (MultA (NumVar "y") (NumVar "x")), Assign "x" (SubA (NumVar "x") (Num 1))]]
+factorial = [Assign "y" (Num 1), While (NegB (EqA (Var "x") (Num 1))) [Assign "y" (MultA (Var "y") (Var "x")), Assign "x" (SubA (Var "x") (Num 1))]]
 factorial' :: Code
 factorial' = [Push 1, Store "y", Loop [Push 1, Fetch "x", Equ, Neg] [Fetch "x", Fetch "y", Mult, Store "y", Push 1, Fetch "x", Sub, Store "x"]]
 
