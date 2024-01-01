@@ -25,26 +25,26 @@ createEmptyStack = []
 createEmptyState :: State 
 createEmptyState = empty
 
+
+-- Shows a value that can be either an Integer or a Bool
+showValue :: Either Integer Bool -> String
+showValue (Left intVal) = show intVal
+showValue (Right boolVal) = show boolVal
+
 -- Returns the string representation of a stack in the form "x,y,z", where x is the top of the stack
 stack2Str :: Stack -> String
 stack2Str [] = ""
 stack2Str (h:t)
-  | null t = case h of
-      Left x -> show x ++ stack2Str t
-      Right x -> show x ++ stack2Str t
-  | otherwise = case h of
-      Left x -> show x ++ "," ++ stack2Str t
-      Right x -> show x ++ "," ++ stack2Str t 
-  
+  | null t = showValue h ++ stack2Str t
+  | otherwise = showValue h ++ "," ++ stack2Str t
+
 -- Returns the string representation of a state in the form "x=1,y=False,z=2", 
 -- where x, y and z are the variables in the state, ordered alphabetically
 state2Str :: State -> String
 state2Str state = case toList state of
   [] -> ""
-  lst -> intercalate "," $ map (\(x, y) -> x ++ "=" ++ showValue y) lst  where
-    showValue :: Either Integer Bool -> String
-    showValue (Left intVal) = show intVal
-    showValue (Right boolVal) = show boolVal
+  lst -> intercalate "," $ map (\(x, y) -> x ++ "=" ++ showValue y) lst
+
 
 -- Runs a list of instructions, returning as output an empty code list,
 -- a stack and the output values in the storage
