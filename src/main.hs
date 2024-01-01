@@ -263,7 +263,7 @@ parseAux tokens =
 
 -- Returns a list of tokens that represents a single instruction and the rest of the tokens still to be parsed
 getInstructions :: [Token] -> [[Token]]
-getInstructions (left : AssignTok : restTokens) = [left : AssignTok : (takeWhile (/= SepTok) restTokens), drop 1 (dropWhile (/= SepTok) restTokens)]
+getInstructions (left : AssignTok : restTokens) = [left : AssignTok : takeWhile (/= SepTok) restTokens, drop 1 (dropWhile (/= SepTok) restTokens)]
 getInstructions (WhileTok : restTokens) = [afterWhile,afterDo, resto] where 
   firstSep = splitOnToken DoTok restTokens;
   afterWhile = fst firstSep;
@@ -341,13 +341,12 @@ parseWhile tokens1 tokens2 = case parseBexp tokens1 of
 -- Parses a sum or subtraction expression
 -- Returns a tuple with the Sum/Subtraction expression and the rest of the tokens still to be parsed
 -- If the tokens do not represent a valid sum or subtraction expression, returns Nothing
-
 parseAexp :: [Token] -> Maybe (Aexp, [Token])
 parseAexp tokens = case parseMultIntPar tokens of
-  Just (expr1, (PlusTok : restTokens1)) -> case parseMultIntPar restTokens1 of
+  Just (expr1, PlusTok : restTokens1) -> case parseMultIntPar restTokens1 of
     Just (expr2, restTokens2) -> Just (AddA expr1 expr2, restTokens2)
     Nothing -> Nothing
-  Just (expr1, (MinusTok : restTokens1)) -> case parseMultIntPar restTokens1 of
+  Just (expr1, MinusTok : restTokens1) -> case parseMultIntPar restTokens1 of
     Just (expr2, restTokens2) -> Just (SubA expr1 expr2, restTokens2)
     Nothing -> Nothing
   result -> result
@@ -357,7 +356,7 @@ parseAexp tokens = case parseMultIntPar tokens of
 -- If the tokens do not represent a valid multiplication expression, returns Nothing
 parseMultIntPar :: [Token] -> Maybe (Aexp, [Token])
 parseMultIntPar tokens = case parseIntPar tokens of 
-  Just (expr1, (MultTok : restTokens1)) -> case parseMultIntPar restTokens1 of
+  Just (expr1, MultTok : restTokens1) -> case parseMultIntPar restTokens1 of
     Just (expr2, restTokens2) -> Just (MultA expr1 expr2, restTokens2)
     Nothing -> Nothing
   result -> result
@@ -369,7 +368,7 @@ parseIntPar :: [Token] -> Maybe (Aexp, [Token])
 parseIntPar (NumTok n : restTokens) = Just (Num n, restTokens)
 parseIntPar (VarTok var : restTokens) = Just (Var var, restTokens)
 parseIntPar (OpenTok : restTokens1) = case parseAexp restTokens1 of
-  Just (expr, (CloseTok : restTokens2)) -> Just (expr, restTokens2)
+  Just (expr, CloseTok : restTokens2) -> Just (expr, restTokens2)
   _ -> Nothing
 parseIntPar tokens = Nothing
 
@@ -384,7 +383,7 @@ parseIntPar tokens = Nothing
 -- If the tokens do not represent a valid boolean expression, returns Nothing
 parseBexp :: [Token] -> Maybe (Bexp, [Token])
 parseBexp tokens = case parseEqBNegEqALeBoolPar tokens of
-  Just (expr1, (AndTok : restTokens1)) -> case parseBexp restTokens1 of
+  Just (expr1, AndTok : restTokens1) -> case parseBexp restTokens1 of
     Just (expr2, restTokens2) -> Just (AndB expr1 expr2, restTokens2)
     Nothing -> Nothing
   result -> result
@@ -394,7 +393,7 @@ parseBexp tokens = case parseEqBNegEqALeBoolPar tokens of
 -- If the tokens do not represent a valid boolean equality expression, returns Nothing
 parseEqBNegEqALeBoolPar :: [Token] -> Maybe (Bexp, [Token])
 parseEqBNegEqALeBoolPar tokens = case parseNegEqALeBoolPar tokens of
-  Just (expr1, (EqBoolTok : restTokens1)) -> case parseEqALeBoolPar restTokens1 of
+  Just (expr1, EqBoolTok : restTokens1) -> case parseEqALeBoolPar restTokens1 of
     Just (expr2, restTokens2) -> Just (EqB expr1 expr2, restTokens2)
     Nothing -> Nothing
   result -> result
@@ -413,7 +412,7 @@ parseNegEqALeBoolPar tokens = parseEqALeBoolPar tokens
 -- If the tokens do not represent a valid arithmetic equality expression, returns Nothing
 parseEqALeBoolPar :: [Token] -> Maybe (Bexp, [Token])
 parseEqALeBoolPar tokens = case parseAexp tokens of
-  Just (expr1, (EqTok : restTokens1)) -> case parseAexp restTokens1 of
+  Just (expr1, EqTok : restTokens1) -> case parseAexp restTokens1 of
     Just (expr2, restTokens2) -> Just (EqA expr1 expr2, restTokens2)
     Nothing -> Nothing
   _ -> parseLeBoolPar tokens
@@ -423,7 +422,7 @@ parseEqALeBoolPar tokens = case parseAexp tokens of
 -- If the tokens do not represent a valid arithmetic less or equal expression, returns Nothing
 parseLeBoolPar :: [Token] -> Maybe (Bexp, [Token])
 parseLeBoolPar tokens = case parseAexp tokens of
-  Just (expr1, (LessEqTok : restTokens1)) -> case parseAexp restTokens1 of
+  Just (expr1, LessEqTok : restTokens1) -> case parseAexp restTokens1 of
     Just (expr2, restTokens2) -> Just (LeA expr1 expr2, restTokens2)
     Nothing -> Nothing
   _ -> parseBoolPar tokens
@@ -435,14 +434,13 @@ parseBoolPar :: [Token] -> Maybe (Bexp, [Token])
 parseBoolPar (TrueTok : restTokens) = Just (Bool True, restTokens)
 parseBoolPar (FalseTok : restTokens) = Just (Bool False, restTokens)
 parseBoolPar (OpenTok : restTokens1) = case parseBexp restTokens1 of
-  Just (exp, (CloseTok : restTokens2)) -> Just (exp, restTokens2)
+  Just (exp, CloseTok : restTokens2) -> Just (exp, restTokens2)
   _ -> Nothing
 parseBoolPar _ = Nothing
 
 
 -- Auxiliar functions that splits the input string into a list of tokens (strings)
 -- Ignores words started by uppercase letters
-
 lexer :: String -> [Token]
 lexer [] = []
 lexer (c:t) = case c of
@@ -471,7 +469,6 @@ lexer (c:t) = case c of
       | otherwise -> lexer t
 
 -- Auxiliar function to convert a string into an integer
-
 stringToInt :: String -> Int
 stringToInt=foldl (\acc chr->10*acc+digitToInt chr) 0
 
