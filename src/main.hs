@@ -1,6 +1,6 @@
-import Data.Map (Map, fromList, toList, (!), member, insert, empty, lookup)
-import Data.List (sort, intercalate)
-import Data.Char (isAlpha, isAlphaNum, isUpper, isLower, isDigit, digitToInt)
+import Data.Map (Map, toList, insert, empty, lookup)
+import Data.List (intercalate)
+import Data.Char (isAlpha, isAlphaNum, isLower, isDigit, digitToInt)
 
 
 data Inst =
