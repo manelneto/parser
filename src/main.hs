@@ -60,7 +60,7 @@ run (h:t, stack, state) = case h of
   Tru -> run (t, true stack, state)
   Fals -> run (t, false stack, state)
   Fetch x -> run (t, fetch x stack state, state)
-  Store x -> run (t, fst stackState, snd stackState) where  stackState = store x stack state
+  Store x -> run (t, fst stackState, snd stackState) where stackState = store x stack state
   Branch c1 c2 -> run (c ++ t, s, state) where (c, s) = branch c1 c2 stack  
   Noop -> run (t, stack, state)
   Loop c1 c2 -> run(c ++ t, stack, state) where c = loop c1 c2
@@ -70,55 +70,50 @@ run (h:t, stack, state) = case h of
 
 -- Instructions
 
--- Adds the top two integer values of the stack, respectively, 
+-- Adds the top two integer values of the stack,
 -- and pushes the result onto the top of the stack
 add :: Stack -> Stack
-add [] = error "Run-time error"
-add [x] = error "Run-time error"
 add (x:y:t) = case (x, y) of
   (Left x, Left y) -> Left (x + y):t
   _ -> error "Run-time error"
+add _ = error "Run-time error"
 
 
--- Multiplies the top two integer values of the stack, respectively,
+-- Multiplies the top two integer values of the stack,
 -- and pushes the result onto the top of the stack
 mult :: Stack -> Stack
-mult [] = error "Run-time error"
-mult [x] = error "Run-time error"
 mult (x:y:t) = case (x, y) of
   (Left x, Left y) -> Left (x * y):t
   _ -> error "Run-time error"
+mult _ = error "Run-time error"
 
 
 -- Subtracts the topmost element of the stack with the second topmost element,
 -- and pushes the result onto the top of the stack
 sub :: Stack -> Stack
-sub [] = error "Run-time error"
-sub [x] = error "Run-time error"
 sub (x:y:t) = case (x, y) of
   (Left x, Left y) -> Left (x - y):t
   _ -> error "Run-time error"
+sub _ = error "Run-time error"
 
 
 -- Compares the top two values of the stack for equality,
 -- and pushes a boolean with the comparison result onto the top of the stack
 eq :: Stack -> Stack
-eq [] = error "Run-time error"
-eq [x] = error "Run-time error"
 eq (x:y:t) = case (x, y) of
   (Left x, Left y) -> Right (x == y):t
   (Right x, Right y) -> Right (x == y):t
   _ -> error "Run-time error"
+eq _ = error "Run-time error"
 
 
--- Determines whether the topmost stack element is less or equal to the second topmost element,
+-- Determines whether the topmost stack element is less than or equal to the second topmost element,
 -- and pushes a boolean with the comparison result onto the top of the stack
 le :: Stack -> Stack
-le [] = error "Run-time error"
-le [x] = error "Run-time error"
 le (x:y:t) = case (x, y) of
   (Left x, Left y) -> Right (x <= y):t
   _ -> error "Run-time error"
+le _ = error "Run-time error"
 
 
 -- Pushes an integer onto the top of the stack
@@ -136,7 +131,7 @@ false :: Stack -> Stack
 false s = Right False:s
 
 
--- Pushes the value bound to x onto the top of the stack.
+-- Pushes the value bound to x onto the top of the stack
 -- If x is not bound, raises a run-time error
 fetch :: String -> Stack -> State -> Stack
 fetch x s state = case Data.Map.lookup x state of
@@ -147,17 +142,16 @@ fetch x s state = case Data.Map.lookup x state of
 
 
 -- Pops the topmost element of the stack,
--- and updates the storage so that the popped value is bound to x.
+-- and updates the storage so that the popped value is bound to x
 store :: String -> Stack -> State -> (Stack, State)
 store x [] state = error "Run-time error"
-store x (h:t) state = 
-    (t, insert x h state)
+store x (h:t) state = (t, insert x h state)
 
 
 -- If the top of the stack is the value True, 
--- the stack is popped and c1 is to be executed next.
+-- the stack is popped and c1 is to be executed next
 -- Otherwise, if the top element of the stack is the value False,
--- then it will be popped and c2 will be executed next.
+-- then it will be popped and c2 will be executed next
 branch :: Code -> Code -> Stack -> (Code, Stack)
 branch c1 c2 [] = error "Run-time error"
 branch c1 c2 (h:t) = case h of
@@ -167,8 +161,7 @@ branch c1 c2 (h:t) = case h of
 
 
 -- Writes c1 to the beggining of the code list,
--- followed by a branch instruction that executes c2 followed by the loop instruction itself.
--- or a Noop 
+-- followed by a branch instruction that executes c2 followed by the loop instruction itself or a Noop 
 loop :: Code -> Code -> Code
 loop c1 c2 = c1 ++ [Branch (c2 ++ [Loop c1 c2]) [Noop]]
 
@@ -182,14 +175,14 @@ neg (h:t) = case h of
   _ -> error "Run-time error"
 
 
--- Pops the two top values of the stack,
+-- Pops the top two values of the stack,
 -- and pushes the result of the logical operation AND between them if they are both booleans
 myAnd :: Stack -> Stack
-myAnd [] = error "Run-time error"
-myAnd [x] = error "Run-time error"
 myAnd (x:y:t) = case (x, y) of
   (Right x, Right y) -> Right (x && y):t
   _ -> error "Run-time error"
+myAnd _ = error "Run-time error"
+
 
 
 -- Aexp is an arithmetic expression
