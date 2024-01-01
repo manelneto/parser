@@ -1,9 +1,7 @@
 import Data.Map (Map, fromList, toList, (!), member, insert, empty, lookup)
 import Data.List (sort, intercalate)
 import Data.Char (isAlpha, isAlphaNum, isUpper, isLower, isDigit, digitToInt)
-import Debug.Trace (trace)
 
-debug = flip trace
 
 data Inst =
   Push Integer | Add | Mult | Sub | Tru | Fals | Equ | Le | And | Neg | Fetch String | Store String | Noop |
@@ -71,7 +69,6 @@ run (h:t, stack, state) = case h of
 
 
 -- Instructions
-
 
 -- Adds the top two integer values of the stack, respectively, 
 -- and pushes the result onto the top of the stack
@@ -195,65 +192,6 @@ myAnd (x:y:t) = case (x, y) of
   _ -> error "Run-time error"
 
 
--- To help you test your assembler
-testAssembler :: Code -> (String, String)
-testAssembler code = (stack2Str stack, state2Str state)
-  where (_,stack,state) = run(code, createEmptyStack, createEmptyState)
-
---
--- Examples:
--- Teste 1 certo testAssembler [Push 10,Push 4,Push 3,Sub,Mult] == ("-10","")
--- Teste 2 certo testAssembler [Fals,Push 3,Tru,Store "var",Store "a", Store "someVar"] == ("","a=3,someVar=False,var=True")
--- Teste 3 certo testAssembler [Fals,Store "var",Fetch "var"] == ("False","var=False")
--- Teste 4 certo testAssembler [Push (-20),Tru,Fals] == ("False,True,-20","")
--- Teste 5 certo testAssembler [Push (-20),Tru,Tru,Neg] == ("False,True,-20","")
--- Teste 6 certo testAssembler [Push (-20),Tru,Tru,Neg,Equ] == ("False,-20","")
--- Teste 7 certo testAssembler [Push (-20),Push (-21), Le] == ("True","")
--- Teste 8 certo testAssembler [Push 5,Store "x",Push 1,Fetch "x",Sub,Store "x"] == ("","x=4")
--- Teste 9 certo testAssembler [Push 10,Store "i",Push 1,Store "fact",Loop [Push 1,Fetch "i",Equ,Neg] [Fetch "i",Fetch "fact",Mult,Store "fact",Push 1,Fetch "i",Sub,Store "i"]] == ("","fact=3628800,i=1")
-
--- If you test:
--- testAssembler [Push 1,Push 2,And]
--- You should get an exception with the string: "Run-time error"
--- If you test:
--- testAssembler [Tru,Tru,Store "y", Fetch "x",Tru]
--- You should get an exception with the string: "Run-time error"
-
-
--- test1 :: Bool
--- test1 = testAssembler [Push 10,Push 4,Push 3,Sub,Mult] == ("-10","")
-
--- test2 :: Bool
--- test2 = testAssembler [Fals,Push 3,Tru,Store "var",Store "a", Store "someVar"] == ("","a=3,someVar=False,var=True")
-
--- test3 :: Bool
--- test3 = testAssembler [Fals,Store "var",Fetch "var"] == ("False","var=False")
-
--- test4 :: Bool
--- test4 = testAssembler [Push (-20),Tru,Fals] == ("False,True,-20","")
-
--- test5 :: Bool
--- test5 = testAssembler [Push (-20),Tru,Tru,Neg] == ("False,True,-20","")
-
--- test6 :: Bool
--- test6 = testAssembler [Push (-20),Tru,Tru,Neg,Equ] == ("False,-20","")
-
--- test7 :: Bool
--- test7 = testAssembler [Push (-20),Push (-21), Le] == ("True","")
-
--- test8 :: Bool
--- test8 = testAssembler [Push 5,Store "x",Push 1,Fetch "x",Sub,Store "x"] == ("","x=4")
-
--- test9 :: Bool
--- test9 = testAssembler [Push 10,Store "i",Push 1,Store "fact",Loop [Push 1,Fetch "i",Equ,Neg] [Fetch "i",Fetch "fact",Mult,Store "fact",Push 1,Fetch "i",Sub,Store "i"]] == ("","fact=3628800,i=1")
-
--- tests :: Bool
--- tests = test1 && test2 && test3 && test4 && test5 && test6 && test7 && test8 && test9
-
-
--- Part 2
-
-
 -- Aexp is an arithmetic expression
 data Aexp = Num Integer | NumVar String | AddA Aexp Aexp | SubA Aexp Aexp | MultA Aexp Aexp deriving Show
 
@@ -265,6 +203,14 @@ data Stm = Assign String Aexp | If Bexp [Stm] [Stm] | While Bexp [Stm] deriving 
 
 -- Program is a list of statements
 type Program = [Stm]
+
+-- Compiles a program Using the functions compA and compB auxiliary functions
+compile :: Program -> Code
+compile [] = []
+compile (h:t) = case h of
+  Assign var expA -> compA expA ++ [Store var] ++ compile t
+  If expB s1 s2 -> compB expB ++ [Branch (compile s1) (compile s2)] ++ compile t
+  While expB s -> Loop (compB expB) (compile s) : compile t
 
 
 -- Compiles an arithmetic expression
@@ -288,13 +234,10 @@ compB expB = case expB of
   NegB exp -> compB exp ++ [Neg]
 
 
--- Compiles a program Using the functions compA and compB auxiliary functions
-compile :: Program -> Code
-compile [] = []
-compile (h:t) = case h of
-  Assign var expA -> compA expA ++ [Store var] ++ compile t
-  If expB s1 s2 -> compB expB ++ [Branch (compile s1) (compile s2)] ++ compile t
-  While expB s -> Loop (compB expB) (compile s) : compile t
+data Token = AssignTok | IfTok | ThenTok | ElseTok | WhileTok | DoTok | SepTok | OpenTok | CloseTok
+           | NumTok Integer | VarTok String | PlusTok | MinusTok | MultTok | NotTok | AndTok 
+           | LessEqTok | EqTok | EqBoolTok | TrueTok | FalseTok deriving (Show, Eq)
+ 
 
 -- Returns a program from a string using the lexer and an auxiliary function.
 parse :: String -> Program
@@ -359,6 +302,11 @@ splitOnToken token list = split list 0 []
       | x == CloseTok = split xs (count - 1) (x:acc)
       | otherwise = split xs count (x:acc)
 
+
+-- ||||||||||||||||||||||||||||||||||
+--        Statement Parsers   
+-- ||||||||||||||||||||||||||||||||||
+
 -- Parses an assignment instruction
 -- Returns a tuple with the assignment statement and the rest of the tokens still to be parsed
 -- If the tokens do not represent a valid assignment, returns Nothing
@@ -393,6 +341,10 @@ parseWhile tokens1 tokens2 = case parseBexp tokens1 of
   _ -> Nothing
 
 
+-- |||||||||||||||||||||||||||||||||||||||||||
+--        Arithmetic Expression Parsers
+-- |||||||||||||||||||||||||||||||||||||||||||
+
 -- Parses a sum or subtraction expression
 -- Returns a tuple with the Sum/Subtraction expression and the rest of the tokens still to be parsed
 -- If the tokens do not represent a valid sum or subtraction expression, returns Nothing
@@ -406,7 +358,6 @@ parseAexp tokens = case parseMultIntPar tokens of
     Just (expr2, restTokens2) -> Just (SubA expr1 expr2, restTokens2)
     Nothing -> Nothing
   result -> result
-
 
 -- Parses a multiplication expression
 -- Returns a tuple with the Multiplication expression and the rest of the tokens still to be parsed
@@ -429,6 +380,11 @@ parseIntPar (OpenTok : restTokens1) = case parseAexp restTokens1 of
   _ -> Nothing
 parseIntPar tokens = Nothing
 
+
+
+-- |||||||||||||||||||||||||||||||||||||||||||
+--        Boolean Expression Parsers
+-- |||||||||||||||||||||||||||||||||||||||||||
 
 -- Parses a boolean expression
 -- Returns a tuple with the boolean expression and the rest of the tokens still to be parsed
@@ -491,13 +447,99 @@ parseBoolPar (OpenTok : restTokens1) = case parseBexp restTokens1 of
 parseBoolPar _ = Nothing
 
 
+-- Auxiliar functions that splits the input string into a list of tokens (strings)
+-- Ignores words started by uppercase letters
+
+lexer :: String -> [Token]
+lexer [] = []
+lexer (c:t) = case c of
+  ' ' -> lexer t
+  ';' -> SepTok : lexer t
+  '(' -> OpenTok : lexer t
+  ')' -> CloseTok : lexer t
+  '+' -> PlusTok : lexer t
+  '-' -> MinusTok : lexer t
+  '*' -> MultTok : lexer t
+  '<' | t /= [] && take 1 t == "=" -> LessEqTok : lexer (drop 1 t)
+  '=' | t /= [] && take 1 t == "=" -> EqTok : lexer (drop 1 t)
+      | otherwise -> EqBoolTok : lexer t
+  ':' | t /= [] && take 1 t == "=" -> AssignTok : lexer (drop 1 t)
+  'n' | t /= [] && take 2 t == "ot" -> NotTok : lexer (drop 2 t)
+  'T' | t /= [] && take  3 t == "rue" -> TrueTok : lexer (drop 3 t)
+  'F' | t /= [] && take 4 t == "alse" -> FalseTok : lexer (drop 4 t)
+  'i' | t /= [] && take 1 t == "f" -> IfTok : lexer (drop 1 t)
+  't' | t /= [] && take 3 t == "hen" -> ThenTok : lexer (drop 3 t)
+  'e' | t /= [] && take 3 t == "lse" -> ElseTok : lexer (drop 3 t)
+  'w' | t /= [] && take 4 t == "hile" -> WhileTok : lexer (drop 4 t)
+  'd' | t /= [] && take 1 t == "o" -> DoTok : lexer (drop 1 t)
+  'a' | t /= [] && take 2 t == "nd" -> AndTok : lexer (drop 2 t)
+  _   | isAlpha c && isLower c -> let (var, rest) = span isAlphaNum (c:t) in VarTok var : lexer rest
+      | isDigit c -> let (num, rest) = span isDigit (c:t) in NumTok (fromIntegral (stringToInt num)) : lexer rest
+      | otherwise -> lexer t
+
+-- Auxiliar function to convert a string into an integer
+
+stringToInt :: String -> Int
+stringToInt=foldl (\acc chr->10*acc+digitToInt chr) 0
 
 
 
--- "x:=1"
---["x",":=","x","-","1",";"]
---[AssignA "x" (Num 5), AssignA "x" (SubA (NumVar "x") (Num 1))]
---["if","(","not","true","and","2","<=","5","=","3","==","4",")","then","x",":=","1",";","else","y",":=","2",";"]
+--
+-- Examples:
+-- Teste 1 certo testAssembler [Push 10,Push 4,Push 3,Sub,Mult] == ("-10","")
+-- Teste 2 certo testAssembler [Fals,Push 3,Tru,Store "var",Store "a", Store "someVar"] == ("","a=3,someVar=False,var=True")
+-- Teste 3 certo testAssembler [Fals,Store "var",Fetch "var"] == ("False","var=False")
+-- Teste 4 certo testAssembler [Push (-20),Tru,Fals] == ("False,True,-20","")
+-- Teste 5 certo testAssembler [Push (-20),Tru,Tru,Neg] == ("False,True,-20","")
+-- Teste 6 certo testAssembler [Push (-20),Tru,Tru,Neg,Equ] == ("False,-20","")
+-- Teste 7 certo testAssembler [Push (-20),Push (-21), Le] == ("True","")
+-- Teste 8 certo testAssembler [Push 5,Store "x",Push 1,Fetch "x",Sub,Store "x"] == ("","x=4")
+-- Teste 9 certo testAssembler [Push 10,Store "i",Push 1,Store "fact",Loop [Push 1,Fetch "i",Equ,Neg] [Fetch "i",Fetch "fact",Mult,Store "fact",Push 1,Fetch "i",Sub,Store "i"]] == ("","fact=3628800,i=1")
+
+-- If you test:
+-- testAssembler [Push 1,Push 2,And]
+-- You should get an exception with the string: "Run-time error"
+-- If you test:
+-- testAssembler [Tru,Tru,Store "y", Fetch "x",Tru]
+-- You should get an exception with the string: "Run-time error"
+
+
+-- test1 :: Bool
+-- test1 = testAssembler [Push 10,Push 4,Push 3,Sub,Mult] == ("-10","")
+
+-- test2 :: Bool
+-- test2 = testAssembler [Fals,Push 3,Tru,Store "var",Store "a", Store "someVar"] == ("","a=3,someVar=False,var=True")
+
+-- test3 :: Bool
+-- test3 = testAssembler [Fals,Store "var",Fetch "var"] == ("False","var=False")
+
+-- test4 :: Bool
+-- test4 = testAssembler [Push (-20),Tru,Fals] == ("False,True,-20","")
+
+-- test5 :: Bool
+-- test5 = testAssembler [Push (-20),Tru,Tru,Neg] == ("False,True,-20","")
+
+-- test6 :: Bool
+-- test6 = testAssembler [Push (-20),Tru,Tru,Neg,Equ] == ("False,-20","")
+
+-- test7 :: Bool
+-- test7 = testAssembler [Push (-20),Push (-21), Le] == ("True","")
+
+-- test8 :: Bool
+-- test8 = testAssembler [Push 5,Store "x",Push 1,Fetch "x",Sub,Store "x"] == ("","x=4")
+
+-- test9 :: Bool
+-- test9 = testAssembler [Push 10,Store "i",Push 1,Store "fact",Loop [Push 1,Fetch "i",Equ,Neg] [Fetch "i",Fetch "fact",Mult,Store "fact",Push 1,Fetch "i",Sub,Store "i"]] == ("","fact=3628800,i=1")
+
+-- tests :: Bool
+-- tests = test1 && test2 && test3 && test4 && test5 && test6 && test7 && test8 && test9
+
+
+-- Exemplos de programas
+-- lexer "x := 5; x := x - 1;"
+-- lexer "x := 0 - 2;"
+-- lexer "if (not True and 2 <= 5 = 3 == 4) then x :=1; else y := 2;"
+-- lexer "x:=23 + variable * 421;while(x !=2)"
 
 -- To help you test your parser
 testParser :: String -> (String, String)
@@ -642,49 +684,7 @@ test7' = testCompiler factorial == code2Str factorial'
 tests' :: Bool
 tests' = test1' && test2' && test3' && test4' && test5' && test6' && test7'
 
-
-data Token = AssignTok | IfTok | ThenTok | ElseTok | WhileTok | DoTok | SepTok | OpenTok | CloseTok
-           | NumTok Integer | VarTok String | PlusTok | MinusTok | MultTok | NotTok | AndTok 
-           | LessEqTok | EqTok | EqBoolTok | TrueTok | FalseTok deriving (Show, Eq)
-           
-
--- Auxiliar functions that splits the input string into a list of strings (tokens)
--- Ignores words started by uppercase letters
-
-lexer :: String -> [Token]
-lexer [] = []
-lexer (c:t) = case c of
-  ' ' -> lexer t
-  ';' -> SepTok : lexer t
-  '(' -> OpenTok : lexer t
-  ')' -> CloseTok : lexer t
-  '+' -> PlusTok : lexer t
-  '-' -> MinusTok : lexer t
-  '*' -> MultTok : lexer t
-  '<' | t /= [] && take 1 t == "=" -> LessEqTok : lexer (drop 1 t)
-  '=' | t /= [] && take 1 t == "=" -> EqTok : lexer (drop 1 t)
-      | otherwise -> EqBoolTok : lexer t
-  ':' | t /= [] && take 1 t == "=" -> AssignTok : lexer (drop 1 t)
-  'n' | t /= [] && take 2 t == "ot" -> NotTok : lexer (drop 2 t)
-  'T' | t /= [] && take  3 t == "rue" -> TrueTok : lexer (drop 3 t)
-  'F' | t /= [] && take 4 t == "alse" -> FalseTok : lexer (drop 4 t)
-  'i' | t /= [] && take 1 t == "f" -> IfTok : lexer (drop 1 t)
-  't' | t /= [] && take 3 t == "hen" -> ThenTok : lexer (drop 3 t)
-  'e' | t /= [] && take 3 t == "lse" -> ElseTok : lexer (drop 3 t)
-  'w' | t /= [] && take 4 t == "hile" -> WhileTok : lexer (drop 4 t)
-  'd' | t /= [] && take 1 t == "o" -> DoTok : lexer (drop 1 t)
-  'a' | t /= [] && take 2 t == "nd" -> AndTok : lexer (drop 2 t)
-  _   | isAlpha c && isLower c -> let (var, rest) = span isAlphaNum (c:t) in VarTok var : lexer rest
-      | isDigit c -> let (num, rest) = span isDigit (c:t) in NumTok (fromIntegral (stringToInt num)) : lexer rest
-      | otherwise -> lexer t
-
--- Exemplos de programas
--- lexer "x := 5; x := x - 1;"
--- lexer "x := 0 - 2;"
--- lexer "if (not True and 2 <= 5 = 3 == 4) then x :=1; else y := 2;"
--- lexer "x:=23 + variable * 421;while(x !=2)"
-
-
-
-stringToInt :: String -> Int
-stringToInt=foldl (\acc chr->10*acc+digitToInt chr) 0
+ -- To help you test your assembler
+testAssembler :: Code -> (String, String)
+testAssembler code = (stack2Str stack, state2Str state)
+  where (_,stack,state) = run(code, createEmptyStack, createEmptyState)
