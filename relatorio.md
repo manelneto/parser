@@ -44,12 +44,8 @@ A função **stack2Str** percorre a pilha e converte cada valor para uma string,
 stack2Str :: Stack -> String
 stack2Str [] = ""
 stack2Str (h:t)
-  | null t = case h of
-      Left x -> show x ++ stack2Str t
-      Right x -> show x ++ stack2Str t
-  | otherwise = case h of
-      Left x -> show x ++ "," ++ stack2Str t
-      Right x -> show x ++ "," ++ stack2Str t 
+  | null t = showValue h ++ stack2Str t
+  | otherwise = showValue h ++ "," ++ stack2Str t
 ```
 
 A função **state2Str** converte o estado para uma lista de pares chave-valor, onde são listados em ordem alfabética e separados por vírgulas. 
@@ -58,10 +54,7 @@ A função **state2Str** converte o estado para uma lista de pares chave-valor, 
 state2Str :: State -> String
 state2Str state = case toList state of
   [] -> ""
-  lst -> intercalate "," $ map (\(x, y) -> x ++ "=" ++ showValue y) lst  where
-    showValue :: Either Integer Bool -> String
-    showValue (Left intVal) = show intVal
-    showValue (Right boolVal) = show boolVal
+  lst -> intercalate "," $ map (\(x, y) -> x ++ "=" ++ showValue y) lst
 ```
 
 Cada instrução é representada por um construtor de dados no tipo **Inst**.
@@ -81,11 +74,10 @@ run (h:t, stack, state) = case h of
   Add -> run (t, add stack, state)
 
 add :: Stack -> Stack
-add [] = error "Run-time error"
-add [x] = error "Run-time error"
 add (x:y:t) = case (x, y) of
   (Left x, Left y) -> Left (x + y):t
   _ -> error "Run-time error"
+add _ = error "Run-time error"
 ```
 
 Em resumo, a função **run** coordena a interpretação de cada instrução, garantindo a integridade da pilha e do estado e, indicando a falha do programa caso ocorra um erro de execução.
@@ -98,7 +90,7 @@ Em resumo, a função **run** coordena a interpretação de cada instrução, ga
 O tipo **Aexp** representa expressões aritméticas. Este tipo é definido por um conjunto de construtores de dados: números inteiros (Num), variáveis (NumVar), adição (AddA), subtração (SubA), e multiplicação (MultA).
 
 ```haskell
-data Aexp = Num Integer | NumVar String | AddA Aexp Aexp | SubA Aexp Aexp | MultA Aexp Aexp deriving Show
+data Aexp = Num Integer | Var String | AddA Aexp Aexp | SubA Aexp Aexp | MultA Aexp Aexp deriving Show
 ```
 
 O tipo **Bexp** representa expressões booleanas. Este tipo é definido por um conjunto de construtores de dados: para valores booleanos (Bool), igualdade de expressões aritméticas (EqA), comparação menor ou igual de expressões aritméticas (LeA), igualdade de expressões booleanas (EqB), conjunção de expressões booleanas (AndB), e negação de expressões booleanas (NegB).
@@ -127,7 +119,7 @@ A função **compA** compila expressões aritméticas para código da máquina v
 compA :: Aexp -> Code
 compA expA = case expA of
   Num num -> [Push num]
-  NumVar var -> [Fetch var]
+  Var var -> [Fetch var]
   AddA left right -> compA right ++ compA left ++ [Add]
   SubA left right -> compA right ++ compA left ++ [Sub]
   MultA left right -> compA right ++ compA left ++ [Mult]
