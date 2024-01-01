@@ -18,6 +18,8 @@ Este relatório apresenta em detalhe a implementação de uma máquina virtual e
 
 Os tipos *Stack* e *State* foram definidos para representar a pilha e o estado da máquina virtual. A pilha é uma lista de valores que podem ser inteiros ou booleanos, enquanto que o estado é um *Map* de pares chave-valor onde as chaves são strings e os valores podem ser inteiros ou booleanos.
 
+Não escolher **data** reflete a intenção de não introduzir construtores de dados adicionais ou estruturas complexas, pois estas já possuem representações claras e simples. O uso de type nesse contexto não só simplifica a notação, mas também facilita a leitura e a compreensão do código.
+
 ```haskell
 type Stack = [Either Integer Bool]
 type State = Map String (Either Integer Bool)
@@ -176,22 +178,26 @@ Assim, o código do parser é composto por diversas funções auxiliares, cada u
    - Retornam uma estrutura de dados representando a instrução e a lista de tokens restantes.
 
 **Funções de Aritmética (`parseAexp`, `parseMultIntPar`, `parseIntPar`):**
-   - Responsáveis por analisar expressões aritméticas, lidando com adição, subtração, multiplicação e operações com números e variáveis.
+   - Responsáveis por analisar expressões aritméticas, lidando com adição, subtração, multiplicação e operações com números e variáveis, respeitando a prioridade e a associatividade dos operadores.
    
 **Funções de Booleanos (`parseBexp`, `parseEqBNegEqALeBoolPar`, `parseNegEqALeBoolPar`, `parseEqALeBoolPar`, `parseLeBoolPar`, `parseBoolPar`):**
    - Dedicadas à análise de expressões booleanas, incluindo operações de igualdade, negação, e comparações.
 
-A hierarquia de operações é um princípio fundamental na análise sintática, garantindo que as expressões sejam avaliadas corretamente, respeitando a precedência e a associatividade dos operadores. Neste contexto, essa hierarquia é mantida cuidadosamente para as operações aritméticas e booleanas.
+A prioridade de operações é um princípio fundamental na análise sintática, garantindo que as expressões sejam avaliadas corretamente, respeitando a precedência e a associatividade dos operadores. Neste contexto, essa hierarquia é mantida cuidadosamente para as operações aritméticas e booleanas.
 
 No caso das operações aritméticas, como adição (PlusTok), subtração (MinusTok), e multiplicação (MultTok), a hierarquia é preservada na função parseAexp. Esta função chama **parseMultIntPar**, que, por sua vez, chama **parseIntPar**. Dessa forma, a análise é realizada de acordo com a prioridade dessas operações, garantindo que a multiplicação seja tratada antes da adição e subtração.
 
-No que diz respeito às operações booleanas, a hierarquia é respeitada na função parseBexp. Esta função chama **parseEqBNegEqALeBoolPar** (lida com igualdade entre booleanos), que, por sua vez, chama **parseNegEqALeBoolPar** (lida com a negação), que por sua vez, chama **parseEqALeBoolPar** (lida com igualdade entre aritmética), que por sua vez, chama **parseLeBoolPar** (lida com a operação menor ou igual entre aritmética), e por fiz, chama **parseBoolPar** (lida com booleanos e parênteses). A hierarquia é mantida ao chamar as funções de forma sequencial, garantindo a avaliação correta das operações booleanas.
+No que diz respeito às operações booleanas, a hierarquia é respeitada na função parseBexp. Esta função chama **parseEqBNegEqALeBoolPar** (lida com igualdade entre booleanos), que, por sua vez, chama **parseNegEqALeBoolPar** (lida com a negação), que por sua vez, chama **parseEqALeBoolPar** (lida com igualdade entre aritmética), que por sua vez, chama **parseLeBoolPar** (lida com a operação menor ou igual entre aritmética), e por fim, chama **parseBoolPar** (lida com booleanos e parênteses). A hierarquia é mantida ao chamar as funções de forma sequencial, garantindo a avaliação correta das operações booleanas.
 
 O código apresenta uma implementação cuidadosa e precisa no tratamento de parênteses, vital para assegurar a correta análise sintática das expressões. Na função **parseIntPar** e **parseBoolPar**, responsáveis por analisar expressões inteiras e booleanas, respetivamente, a presença de parênteses é estrategicamente considerada. Com a presença de um parêntese de abertura (**OpenTok**), a função invoca recursivamente **parseAexp** e **parseBexp**, respetivamente, para analisar a expressão contida dentro dos parênteses. Em seguida, verifica a presença do parêntese de fecho correspondente (**CloseTok**). Esta abordagem garante que as expressões contidas nos parênteses sejam avaliadas primeiro, seguindo a ordem estabelecida pela hierarquia de operações aritméticas e booleanas. Da mesma forma, na função **getInstructions**, que divide a lista de tokens em partes correspondentes a instruções específicas, o código lida adequadamente com parênteses. Ao encontrar um parêntese de abertura, a função chama recursivamente a si mesma, garantindo que as instruções dentro dos parênteses sejam processadas corretamente.
 
 **Funções Principais (`parse`, `parseAux`):**
    - Utiliza as funções auxiliares mencionadas acima para realizar a análise sintática geral da lista de tokens.
    - Itera sobre as instruções, construindo a AST do programa à medida que avança.
+
+## Conclusão
+
+A implementação de uma máquina virtual em Haskell, apresentada neste relatório, representa um esforço abrangente para executar programas de baixo nível eficientemente. Ao abordar a definição de tipos, funções e estruturas, procuramos oferecer uma solução flexível e robusta, elaborando tipos de dados, estratégias de execução eficientes e a capacidade de compilar programas imperativos. A integração de conceitos fundamentais, como o lexer e o parser, enriquece a implementação e a execução de instruções específicas.
 
 
 
