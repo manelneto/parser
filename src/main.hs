@@ -186,7 +186,7 @@ myAnd _ = error "Run-time error"
 
 
 -- Aexp is an arithmetic expression
-data Aexp = Num Integer | NumVar String | AddA Aexp Aexp | SubA Aexp Aexp | MultA Aexp Aexp deriving Show
+data Aexp = Num Integer | Var String | AddA Aexp Aexp | SubA Aexp Aexp | MultA Aexp Aexp deriving Show
 
 -- Bexp is a boolean expression
 data Bexp = Bool Bool | EqA Aexp Aexp | LeA Aexp Aexp | EqB Bexp Bexp | AndB Bexp Bexp | NegB Bexp deriving Show
@@ -210,7 +210,7 @@ compile (h:t) = case h of
 compA :: Aexp -> Code
 compA expA = case expA of
   Num num -> [Push num]
-  NumVar var -> [Fetch var]
+  Var var -> [Fetch var]
   AddA left right -> compA right ++ compA left ++ [Add]
   SubA left right -> compA right ++ compA left ++ [Sub]
   MultA left right -> compA right ++ compA left ++ [Mult]
@@ -367,7 +367,7 @@ parseMultIntPar tokens = case parseIntPar tokens of
 -- If the tokens do not represent a valid integer or variable expression, returns Nothing
 parseIntPar :: [Token] -> Maybe (Aexp, [Token])
 parseIntPar (NumTok n : restTokens) = Just (Num n, restTokens)
-parseIntPar (VarTok var : restTokens) = Just (NumVar var, restTokens)
+parseIntPar (VarTok var : restTokens) = Just (Var var, restTokens)
 parseIntPar (OpenTok : restTokens1) = case parseAexp restTokens1 of
   Just (expr, (CloseTok : restTokens2)) -> Just (expr, restTokens2)
   _ -> Nothing
@@ -602,25 +602,25 @@ correct1 = [Push 10, Store "x"]
 
 -- Exemplo de sequência de comandos: x := 5; y := x + 3;
 program2 :: Program
-program2 = [Assign "x" (Num 5), Assign "y" (AddA (NumVar "x") (Num 3))]
+program2 = [Assign "x" (Num 5), Assign "y" (AddA (Var "x") (Num 3))]
 correct2 :: Code
 correct2 = [Push 5, Store "x", Push 3, Fetch "x", Add, Store "y"]
 
 -- Exemplo de condicional: if x = 0 then y := 1 else y := 2;
 program3 :: Program
-program3 = [If (EqA (NumVar "x") (Num 0)) [Assign "y" (Num 1)] [Assign "y" (Num 2)]]
+program3 = [If (EqA (Var "x") (Num 0)) [Assign "y" (Num 1)] [Assign "y" (Num 2)]]
 correct3 :: Code
 correct3 = [Push 0, Fetch "x", Equ, Branch [Push 1, Store "y"] [Push 2, Store "y"]]
 
 -- Exemplo de while loop: while x > 0 do x := x - 1;
 program4 :: Program
-program4 = [While (NegB (LeA (NumVar "x") (Num 0))) [Assign "x" (SubA (NumVar "x") (Num 1))]]
+program4 = [While (NegB (LeA (Var "x") (Num 0))) [Assign "x" (SubA (Var "x") (Num 1))]]
 correct4 :: Code
 correct4 = [Loop [Push 0, Fetch "x", Le, Neg] [Push 1, Fetch "x", Sub, Store "x"]]
 
 -- Exemplo de while loop: while x != 0 do x := x - 1;
 program5 :: Program
-program5 = [Assign "x" (Num 10),While (NegB (EqA (NumVar "x") (Num 0))) [Assign "x" (SubA (NumVar "x") (Num 1))]]
+program5 = [Assign "x" (Num 10),While (NegB (EqA (Var "x") (Num 0))) [Assign "x" (SubA (Var "x") (Num 1))]]
 
 -- x = 1
 assignment :: Program
@@ -630,7 +630,7 @@ assignment' = [Push 1, Store "x"]
 
 -- x = 1; y = x + 2
 addition :: Program
-addition = [Assign "x" (Num 1), Assign "y" (AddA (NumVar "x") (Num 2))]
+addition = [Assign "x" (Num 1), Assign "y" (AddA (Var "x") (Num 2))]
 addition' :: Code
 addition' = [Push 1, Store "x", Push 2, Fetch "x", Add, Store "y"]
 
@@ -638,7 +638,7 @@ addition' = [Push 1, Store "x", Push 2, Fetch "x", Add, Store "y"]
 -- ! VEJAM ESTE EXEMPLO DO PDF
 -- y = 1; while (x != 1) do (y = y * x; x = x - 1)
 factorial :: Program
-factorial = [Assign "y" (Num 1), While (NegB (EqA (NumVar "x") (Num 1))) [Assign "y" (MultA (NumVar "y") (NumVar "x")), Assign "x" (SubA (NumVar "x") (Num 1))]]
+factorial = [Assign "y" (Num 1), While (NegB (EqA (Var "x") (Num 1))) [Assign "y" (MultA (Var "y") (Var "x")), Assign "x" (SubA (Var "x") (Num 1))]]
 factorial' :: Code
 factorial' = [Push 1, Store "y", Loop [Push 1, Fetch "x", Equ, Neg] [Fetch "x", Fetch "y", Mult, Store "y", Push 1, Fetch "x", Sub, Store "x"]]
 
