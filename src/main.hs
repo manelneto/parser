@@ -70,6 +70,7 @@ run (h:t, stack, state) = case h of
 
 -- Instructions
 
+
 -- Adds the top two integer values of the stack,
 -- and pushes the result onto the top of the stack
 add :: Stack -> Stack
@@ -233,7 +234,7 @@ data Token = AssignTok | IfTok | ThenTok | ElseTok | WhileTok | DoTok | SepTok |
            | LessEqTok | EqTok | EqBoolTok | TrueTok | FalseTok deriving (Show, Eq)
  
 
--- Returns a program from a string using the lexer and an auxiliary function.
+-- Returns a program from a string using the lexer and an auxiliary function
 parse :: String -> Program
 parse input = parseAux (lexer input)
 
@@ -244,17 +245,17 @@ parseAux [] = []
 parseAux tokens =
   case instructionId of
     "assign" ->
-      case parseAssign (instruction !! 0) of
+      case parseAssign (head instruction) of
         Just (assignStm, []) -> assignStm : parseAux restTokens
         _ -> error "Parse error"
 
     "while" ->
-      case parseWhile (instruction !! 0) (instruction !! 1) of
+      case parseWhile (head instruction) (instruction !! 1) of
         Just (whileStm, []) -> whileStm : parseAux restTokens
         _ -> error "Parse error"
 
     "if" ->
-      case parseIfThenElse (instruction !! 0) (instruction !! 1) (instruction !! 2) of
+      case parseIfThenElse (head instruction) (instruction !! 1) (instruction !! 2) of
         Just (ifStm, []) -> ifStm : parseAux restTokens
         _ -> error "Parse error"
 
@@ -262,32 +263,33 @@ parseAux tokens =
   where
     (instructionId, instruction, restTokens) = getInstructions tokens
 
+
 -- Returns a list of tokens that represents a single instruction and the rest of the tokens still to be parsed
 getInstructions :: [Token] -> (String, [[Token]], [Token])
-getInstructions (left : AssignTok : restTokens) = ("assign", assign, resto) where
-  assign = [left : AssignTok : (takeWhile (/= SepTok) restTokens)]
-  resto = drop 1 (dropWhile (/= SepTok) restTokens)
-getInstructions (WhileTok : restTokens) = ("while", [afterWhile,afterDo], resto) where 
+getInstructions (left : AssignTok : restTokens) = ("assign", assign, rest) where
+  assign = [left : AssignTok : takeWhile (/= SepTok) restTokens]
+  rest = drop 1 (dropWhile (/= SepTok) restTokens)
+getInstructions (WhileTok : restTokens) = ("while", [afterWhile, afterDo], rest) where 
   firstSep = splitOnToken DoTok restTokens;
   afterWhile = fst firstSep;
-  sndSep = splitOnToken SepTok (snd firstSep);
-  afterDo = fst sndSep;
-  resto = snd sndSep;
-getInstructions (IfTok : restTokens) = ("if", [afterIf, afterThen, afterElse], resto)
+  secondSep = splitOnToken SepTok (snd firstSep);
+  afterDo = fst secondSep;
+  rest = snd secondSep;
+getInstructions (IfTok : restTokens) = ("if", [afterIf, afterThen, afterElse], rest)
   where
   firstSep = splitOnToken ThenTok restTokens;
   afterIf = fst firstSep;
-  sndSep = splitOnToken ElseTok (snd firstSep);
-  afterThen = fst sndSep;
-  thdSep = splitOnToken SepTok (snd sndSep);
-  afterElse = fst thdSep;
-  resto = snd thdSep; 
+  secondSep = splitOnToken ElseTok (snd firstSep);
+  afterThen = fst secondSep;
+  thirdSep = splitOnToken SepTok (snd secondSep);
+  afterElse = fst thirdSep;
+  rest = snd thirdSep;
 getInstructions (OpenTok : restTokens) = getInstructions (init restTokens)
 
 
--- Splits a list of tokens into two lists of tokens,
+-- Splits a list of tokens into two lists of tokens:
 -- the first one containing the tokens before the first ocurrence of the given token regarding parenthesis,
--- and the second one containing the tokens after that ocurrence of the token.
+-- and the second one containing the tokens after that ocurrence of the token
 splitOnToken :: Token -> [Token] -> ([Token], [Token])
 splitOnToken token list = split list 0 []
   where
@@ -299,11 +301,10 @@ splitOnToken token list = split list 0 []
       | otherwise = split xs count (x:acc)
 
 
--- ||||||||||||||||||||||||||||||||||
---        Statement Parsers   
--- ||||||||||||||||||||||||||||||||||
+-- Statement Parsers
 
--- Parses an assignment instruction
+
+-- Parses an assignment statement
 -- Returns a tuple with the assignment statement and the rest of the tokens still to be parsed
 -- If the tokens do not represent a valid assignment, returns Nothing
 parseAssign :: [Token] -> Maybe (Stm, [Token])
@@ -313,7 +314,7 @@ parseAssign (VarTok varName : AssignTok : restTokens) = case parseAexp restToken
 parseAssign _ = Nothing
 
 
--- Parses an if-then-else instruction
+-- Parses an if-then-else statement
 -- Returns a tuple with the if-then-else statement and the rest of the tokens still to be parsed
 -- If the tokens do not represent a valid if-then-else, returns Nothing
 parseIfThenElse :: [Token] -> [Token] -> [Token] -> Maybe (Stm, [Token])
@@ -326,7 +327,7 @@ parseIfThenElse tokens1 tokens2 tokens3 = case parseBexp tokens1 of
   _ -> Nothing 
 
 
--- Parses a while instruction
+-- Parses a while statement
 -- Returns a tuple with the while statement and the rest of the tokens still to be parsed
 -- If the tokens do not represent a valid while, returns Nothing
 parseWhile :: [Token] -> [Token] -> Maybe (Stm, [Token])
@@ -337,9 +338,8 @@ parseWhile tokens1 tokens2 = case parseBexp tokens1 of
   _ -> Nothing
 
 
--- |||||||||||||||||||||||||||||||||||||||||||
---        Arithmetic Expression Parsers
--- |||||||||||||||||||||||||||||||||||||||||||
+-- Arithmetic Expression Parsers
+
 
 -- Parses a sum or subtraction expression
 -- Returns a tuple with the Sum/Subtraction expression and the rest of the tokens still to be parsed
@@ -354,6 +354,7 @@ parseAexp tokens = case parseMultIntPar tokens of
     Nothing -> Nothing
   result -> result
 
+
 -- Parses a multiplication expression
 -- Returns a tuple with the Multiplication expression and the rest of the tokens still to be parsed
 -- If the tokens do not represent a valid multiplication expression, returns Nothing
@@ -363,6 +364,7 @@ parseMultIntPar tokens = case parseIntPar tokens of
     Just (expr2, restTokens2) -> Just (MultA expr1 expr2, restTokens2)
     Nothing -> Nothing
   result -> result
+
 
 -- Parses an integer, variable expression or a parenthesis expression
 -- Returns a tuple with the Integer or Variable expression and the rest of the tokens still to be parsed
@@ -376,10 +378,8 @@ parseIntPar (OpenTok : restTokens1) = case parseAexp restTokens1 of
 parseIntPar tokens = Nothing
 
 
+-- Boolean Expression Parsers
 
--- |||||||||||||||||||||||||||||||||||||||||||
---        Boolean Expression Parsers
--- |||||||||||||||||||||||||||||||||||||||||||
 
 -- Parses a boolean expression
 -- Returns a tuple with the boolean expression and the rest of the tokens still to be parsed
@@ -391,6 +391,7 @@ parseBexp tokens = case parseEqBNegEqALeBoolPar tokens of
     Nothing -> Nothing
   result -> result
 
+
 -- Parses a boolean equality expression
 -- Returns a tuple with the boolean equality expression and the rest of the tokens still to be parsed
 -- If the tokens do not represent a valid boolean equality expression, returns Nothing
@@ -401,6 +402,7 @@ parseEqBNegEqALeBoolPar tokens = case parseNegEqALeBoolPar tokens of
     Nothing -> Nothing
   result -> result
 
+
 -- Parses a boolean negation expression
 -- Returns a tuple with the boolean negation expression and the rest of the tokens still to be parsed
 -- If the tokens do not represent a valid boolean negation expression, returns Nothing
@@ -409,6 +411,7 @@ parseNegEqALeBoolPar (NotTok:restTokens) = case parseEqALeBoolPar restTokens of
   Just (expr,restTokens2) -> Just (NegB expr, restTokens2)
   result -> result
 parseNegEqALeBoolPar tokens = parseEqALeBoolPar tokens
+
 
 -- Parses an arithmetic equality expression
 -- Returns a tuple with the arithmetic equality expression and the rest of the tokens still to be parsed
@@ -420,6 +423,7 @@ parseEqALeBoolPar tokens = case parseAexp tokens of
     Nothing -> Nothing
   _ -> parseLeBoolPar tokens
 
+
 -- Parses an arithmetic less or equal expression
 -- Returns a tuple with the arithmetic less or equal expression and the rest of the tokens still to be parsed
 -- If the tokens do not represent a valid arithmetic less or equal expression, returns Nothing
@@ -429,6 +433,7 @@ parseLeBoolPar tokens = case parseAexp tokens of
     Just (expr2, restTokens2) -> Just (LeA expr1 expr2, restTokens2)
     Nothing -> Nothing
   _ -> parseBoolPar tokens
+
 
 -- Parses a boolean expression between parenthesis
 -- Returns a tuple with the boolean expression and the rest of the tokens still to be parsed
@@ -442,7 +447,7 @@ parseBoolPar (OpenTok : restTokens1) = case parseBexp restTokens1 of
 parseBoolPar _ = Nothing
 
 
--- Auxiliar functions that splits the input string into a list of tokens (strings)
+-- Auxiliar functions that splits the input string into a list of tokens
 -- Ignores words started by uppercase letters
 lexer :: String -> [Token]
 lexer [] = []
@@ -471,213 +476,20 @@ lexer (c:t) = case c of
       | isDigit c -> let (num, rest) = span isDigit (c:t) in NumTok (fromIntegral (stringToInt num)) : lexer rest
       | otherwise -> lexer t
 
+
 -- Auxiliar function to convert a string into an integer
 stringToInt :: String -> Int
-stringToInt=foldl (\acc chr->10*acc+digitToInt chr) 0
+stringToInt = foldl (\acc chr->10*acc+digitToInt chr) 0
 
 
 
---
--- Examples:
--- Teste 1 certo testAssembler [Push 10,Push 4,Push 3,Sub,Mult] == ("-10","")
--- Teste 2 certo testAssembler [Fals,Push 3,Tru,Store "var",Store "a", Store "someVar"] == ("","a=3,someVar=False,var=True")
--- Teste 3 certo testAssembler [Fals,Store "var",Fetch "var"] == ("False","var=False")
--- Teste 4 certo testAssembler [Push (-20),Tru,Fals] == ("False,True,-20","")
--- Teste 5 certo testAssembler [Push (-20),Tru,Tru,Neg] == ("False,True,-20","")
--- Teste 6 certo testAssembler [Push (-20),Tru,Tru,Neg,Equ] == ("False,-20","")
--- Teste 7 certo testAssembler [Push (-20),Push (-21), Le] == ("True","")
--- Teste 8 certo testAssembler [Push 5,Store "x",Push 1,Fetch "x",Sub,Store "x"] == ("","x=4")
--- Teste 9 certo testAssembler [Push 10,Store "i",Push 1,Store "fact",Loop [Push 1,Fetch "i",Equ,Neg] [Fetch "i",Fetch "fact",Mult,Store "fact",Push 1,Fetch "i",Sub,Store "i"]] == ("","fact=3628800,i=1")
-
--- If you test:
--- testAssembler [Push 1,Push 2,And]
--- You should get an exception with the string: "Run-time error"
--- If you test:
--- testAssembler [Tru,Tru,Store "y", Fetch "x",Tru]
--- You should get an exception with the string: "Run-time error"
-
-
--- test1 :: Bool
--- test1 = testAssembler [Push 10,Push 4,Push 3,Sub,Mult] == ("-10","")
-
--- test2 :: Bool
--- test2 = testAssembler [Fals,Push 3,Tru,Store "var",Store "a", Store "someVar"] == ("","a=3,someVar=False,var=True")
-
--- test3 :: Bool
--- test3 = testAssembler [Fals,Store "var",Fetch "var"] == ("False","var=False")
-
--- test4 :: Bool
--- test4 = testAssembler [Push (-20),Tru,Fals] == ("False,True,-20","")
-
--- test5 :: Bool
--- test5 = testAssembler [Push (-20),Tru,Tru,Neg] == ("False,True,-20","")
-
--- test6 :: Bool
--- test6 = testAssembler [Push (-20),Tru,Tru,Neg,Equ] == ("False,-20","")
-
--- test7 :: Bool
--- test7 = testAssembler [Push (-20),Push (-21), Le] == ("True","")
-
--- test8 :: Bool
--- test8 = testAssembler [Push 5,Store "x",Push 1,Fetch "x",Sub,Store "x"] == ("","x=4")
-
--- test9 :: Bool
--- test9 = testAssembler [Push 10,Store "i",Push 1,Store "fact",Loop [Push 1,Fetch "i",Equ,Neg] [Fetch "i",Fetch "fact",Mult,Store "fact",Push 1,Fetch "i",Sub,Store "i"]] == ("","fact=3628800,i=1")
-
--- tests :: Bool
--- tests = test1 && test2 && test3 && test4 && test5 && test6 && test7 && test8 && test9
-
-
--- Exemplos de programas
--- lexer "x := 5; x := x - 1;"
--- lexer "x := 0 - 2;"
--- lexer "if (not True and 2 <= 5 = 3 == 4) then x :=1; else y := 2;"
--- lexer "x:=23 + variable * 421;while(x !=2)"
-
--- To help you test your parser
-testParser :: String -> (String, String)
-testParser programCode = (stack2Str stack, state2Str state)
-  where (_,stack,state) = run(compile (parse programCode), createEmptyStack, createEmptyState)
-
--- Examples:
--- testParser "x := 5; x := x - 1;" == ("","x=4")
--- testParser "x := 0 - 2;" == ("","x=-2")
--- testParser "if (not True and 2 <= 5 = 3 == 4) then x :=1; else y := 2;" == ("","y=2")
--- testParser "x := 42; if x <= 43 then x := 1; else (x := 33; x := x+1;);" == ("","x=1")
--- testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1;" == ("","x=2")
--- testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1; z := x+x;" == ("","x=2,z=4")
--- testParser "x := 44; if x <= 43 then x := 1; else (x := 33; x := x+1;); y := x*2;" == ("","x=34,y=68")
--- testParser "x := 42; if x <= 43 then (x := 33; x := x+1;); else x := 1;" == ("","x=34")
--- testParser "if (1 == 0+1 = 2+1 == 3) then x := 1; else x := 2;" == ("","x=1")
--- testParser "if (1 == 0+1 = (2+1 == 4)) then x := 1; else x := 2;" == ("","x=2")
--- testParser "x := 2; y := (x - 3)*(4 + 2*3); z := x +x*(2);" == ("","x=2,y=-10,z=6")
--- testParser "i := 10; fact := 1; while (not(i == 1)) do (fact := fact * i; i := i - 1;);" == ("","fact=3628800,i=1")
-
-
-test1 :: Bool
-test1 = testParser "x := 5; x := x - 1;" == ("","x=4")
-
-test2 :: Bool
-test2 = testParser "x := 0 - 2;" == ("","x=-2")
-
-test3 :: Bool
-test3 = testParser "if (not True and 2 <= 5 = 3 == 4) then x :=1; else y := 2;" == ("","y=2")
-
-test4 :: Bool
-test4 = testParser "x := 42; if x <= 43 then x := 1; else (x := 33; x := x+1;);" == ("","x=1")
-
-test5 :: Bool
-test5 = testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1;" == ("","x=2")
-
-test6 :: Bool
-test6 = testParser "x := 42; if x <= 43 then x := 1; else x := 33; x := x+1; z := x+x;" == ("","x=2,z=4")
-
-test7 :: Bool
-test7 = testParser "x := 44; if x <= 43 then x := 1; else (x := 33; x := x+1;); y := x*2;" == ("","x=34,y=68")
-
-test8 :: Bool
-test8 = testParser "x := 42; if x <= 43 then (x := 33; x := x+1;) else x := 1;" == ("","x=34")
-
-test9 :: Bool
-test9 = testParser "if (1 == 0+1 = 2+1 == 3) then x := 1; else x := 2;" == ("","x=1")
-
-test10 :: Bool
-test10 = testParser "if (1 == 0+1 = (2+1 == 4)) then x := 1; else x := 2;" == ("","x=2")
-
-test11 :: Bool
-test11 = testParser "x := 2; y := (x - 3)*(4 + 2*3); z := x +x*(2);" == ("","x=2,y=-10,z=6")
-
-test12 :: Bool
-test12 = testParser "i := 10; fact := 1; while (not(i == 1)) do (fact := fact * i; i := i - 1;);" == ("","fact=3628800,i=1")
-
-tests :: Bool
-tests = test1 && test2 && test3 && test4 && test5 && test6 && test7 && test8 && test9 && test10 && test11 && test12
-
-
--- Exemplo de programa simples: x := 10;
-program1 :: Program
-program1 = [Assign "x" (Num 10)]
-correct1 :: Code
-correct1 = [Push 10, Store "x"]
-
--- Exemplo de sequência de comandos: x := 5; y := x + 3;
-program2 :: Program
-program2 = [Assign "x" (Num 5), Assign "y" (AddA (Var "x") (Num 3))]
-correct2 :: Code
-correct2 = [Push 5, Store "x", Push 3, Fetch "x", Add, Store "y"]
-
--- Exemplo de condicional: if x = 0 then y := 1 else y := 2;
-program3 :: Program
-program3 = [If (EqA (Var "x") (Num 0)) [Assign "y" (Num 1)] [Assign "y" (Num 2)]]
-correct3 :: Code
-correct3 = [Push 0, Fetch "x", Equ, Branch [Push 1, Store "y"] [Push 2, Store "y"]]
-
--- Exemplo de while loop: while x > 0 do x := x - 1;
-program4 :: Program
-program4 = [While (NegB (LeA (Var "x") (Num 0))) [Assign "x" (SubA (Var "x") (Num 1))]]
-correct4 :: Code
-correct4 = [Loop [Push 0, Fetch "x", Le, Neg] [Push 1, Fetch "x", Sub, Store "x"]]
-
--- Exemplo de while loop: while x != 0 do x := x - 1;
-program5 :: Program
-program5 = [Assign "x" (Num 10),While (NegB (EqA (Var "x") (Num 0))) [Assign "x" (SubA (Var "x") (Num 1))]]
-
--- x = 1
-assignment :: Program
-assignment = [Assign "x" (Num 1)]
-assignment' :: Code
-assignment' = [Push 1, Store "x"]
-
--- x = 1; y = x + 2
-addition :: Program
-addition = [Assign "x" (Num 1), Assign "y" (AddA (Var "x") (Num 2))]
-addition' :: Code
-addition' = [Push 1, Store "x", Push 2, Fetch "x", Add, Store "y"]
-
-
--- ! VEJAM ESTE EXEMPLO DO PDF
--- y = 1; while (x != 1) do (y = y * x; x = x - 1)
-factorial :: Program
-factorial = [Assign "y" (Num 1), While (NegB (EqA (Var "x") (Num 1))) [Assign "y" (MultA (Var "y") (Var "x")), Assign "x" (SubA (Var "x") (Num 1))]]
-factorial' :: Code
-factorial' = [Push 1, Store "y", Loop [Push 1, Fetch "x", Equ, Neg] [Fetch "x", Fetch "y", Mult, Store "y", Push 1, Fetch "x", Sub, Store "x"]]
-
-
-code2Str :: Code -> String
-code2Str [] = ""
-code2Str (h:t)
-  | null t = show h ++ code2Str t
-  | otherwise = show h ++ "," ++ code2Str t
-
-testCompiler :: Program -> String
-testCompiler program = code2Str code
-  where code = compile program
-
-test1' :: Bool
-test1' = testCompiler program1 == code2Str correct1
-
-test2' :: Bool
-test2' = testCompiler program2 == code2Str correct2
-
-test3' :: Bool
-test3' = testCompiler program3 == code2Str correct3
-
-test4' :: Bool
-test4' = testCompiler program4 == code2Str correct4
-
-test5' :: Bool
-test5' = testCompiler assignment == code2Str assignment'
-
-test6' :: Bool
-test6' = testCompiler addition == code2Str addition'
-
-test7' :: Bool
-test7' = testCompiler factorial == code2Str factorial'
-
-tests' :: Bool
-tests' = test1' && test2' && test3' && test4' && test5' && test6' && test7'
-
- -- To help you test your assembler
+-- Helper function to test the assembler
 testAssembler :: Code -> (String, String)
 testAssembler code = (stack2Str stack, state2Str state)
   where (_,stack,state) = run(code, createEmptyStack, createEmptyState)
+
+
+-- Helper function to test the parser
+testParser :: String -> (String, String)
+testParser programCode = (stack2Str stack, state2Str state)
+  where (_,stack,state) = run(compile (parse programCode), createEmptyStack, createEmptyState)
