@@ -197,7 +197,8 @@ data Stm = Assign String Aexp | If Bexp [Stm] [Stm] | While Bexp [Stm] deriving 
 -- Program is a list of statements
 type Program = [Stm]
 
--- Compiles a program Using the functions compA and compB auxiliary functions
+
+-- Compiles a program using the auxiliary functions compA and compB
 compile :: Program -> Code
 compile [] = []
 compile (h:t) = case h of
