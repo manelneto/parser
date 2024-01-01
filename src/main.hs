@@ -251,33 +251,35 @@ parseAux tokens =
   case instructionId of
     "assign" ->
       case parseAssign (instruction !! 0) of
-        Just (assignStm, []) -> assignStm : parseAux (instruction !! 1)
+        Just (assignStm, []) -> assignStm : parseAux restTokens
         _ -> error "Parse error"
 
     "while" ->
       case parseWhile (instruction !! 0) (instruction !! 1) of
-        Just (whileStm, []) -> whileStm : parseAux (instruction !! 2)
+        Just (whileStm, []) -> whileStm : parseAux restTokens
         _ -> error "Parse error"
 
     "if" ->
       case parseIfThenElse (instruction !! 0) (instruction !! 1) (instruction !! 2) of
-        Just (ifStm, []) -> ifStm : parseAux (instruction !! 3)
+        Just (ifStm, []) -> ifStm : parseAux restTokens
         _ -> error "Parse error"
 
     _ -> error "Invalid instruction length"
   where
-    (instructionId, instruction) = getInstructions tokens
+    (instructionId, instruction, restTokens) = getInstructions tokens
 
 -- Returns a list of tokens that represents a single instruction and the rest of the tokens still to be parsed
-getInstructions :: [Token] -> (String, [[Token]])
-getInstructions (left : AssignTok : restTokens) = ("assign", [left : AssignTok : (takeWhile (/= SepTok) restTokens), drop 1 (dropWhile (/= SepTok) restTokens)])
-getInstructions (WhileTok : restTokens) = ("while", [afterWhile,afterDo, resto]) where 
+getInstructions :: [Token] -> (String, [[Token]], [Token])
+getInstructions (left : AssignTok : restTokens) = ("assign", assign, resto) where
+  assign = [left : AssignTok : (takeWhile (/= SepTok) restTokens)]
+  resto = drop 1 (dropWhile (/= SepTok) restTokens)
+getInstructions (WhileTok : restTokens) = ("while", [afterWhile,afterDo], resto) where 
   firstSep = splitOnToken DoTok restTokens;
   afterWhile = fst firstSep;
   sndSep = splitOnToken SepTok (snd firstSep);
   afterDo = fst sndSep;
   resto = snd sndSep;
-getInstructions (IfTok : restTokens) = ("if", [afterIf, afterThen, afterElse, resto])
+getInstructions (IfTok : restTokens) = ("if", [afterIf, afterThen, afterElse], resto)
   where
   firstSep = splitOnToken ThenTok restTokens;
   afterIf = fst firstSep;
