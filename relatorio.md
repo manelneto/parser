@@ -121,6 +121,80 @@ type Program = [Stm]
 
 ### Definição das funções
 
+A função **compA** compila expressões aritméticas para código da máquina virtual. Utiliza recursão para percorrer a expressão, gerando o código correspondente para números, variáveis e operadores aritméticos.
+
+```haskell
+compA :: Aexp -> Code
+compA expA = case expA of
+  Num num -> [Push num]
+  NumVar var -> [Fetch var]
+  AddA left right -> compA right ++ compA left ++ [Add]
+  SubA left right -> compA right ++ compA left ++ [Sub]
+  MultA left right -> compA right ++ compA left ++ [Mult]
+```
+
+A função **compB**  compila expressões booleanas para código da máquina virtual. Similar a compA, utiliza recursão para percorrer a expressão e gera o código correspondente para valores booleanos, operadores de comparação e operadores lógicos.
+
+```haskell
+compB :: Bexp -> Code
+compB expB = case expB of
+  Bool bool -> if bool then [Tru] else [Fals]
+  EqA left right -> compA right ++ compA left ++ [Equ]
+  LeA left right -> compA right ++ compA left ++ [Le]
+  EqB left right -> compB right ++ compB left ++ [Equ]
+  AndB left right -> compB right ++ compB left ++ [And]
+  NegB exp -> compB exp ++ [Neg]
+```
+
+A função **compile** compila programas **Stm** para código da máquina virtual. Utiliza recursão para percorrer a lista de instruções e gera o código correspondente para cada tipo de instrução. É, asssim, considerada fundamental para a tradução efetiva de programas imperativos em código executável pela máquina virtual definida.
+
+```haskell
+compile :: Program -> Code
+compile [] = []
+compile (h:t) = case h of
+  Assign var expA -> compA expA ++ [Store var] ++ compile t
+  If expB s1 s2 -> compB expB ++ [Branch (compile s1) (compile s2)] ++ compile t
+  While expB s -> Loop (compB expB) (compile s) : compile t
+```
+
+Este compilador suporta atribuições, estruturas condicionais e loops, gerando código apropriado para cada caso.
+
+#### Lexer
+
+O **lexer** é responsável por transformar uma string numa lista de tokens, onde cada token representa um componente léxico da linguagem. Atua, asssim, como a primeira fase do compilador, identificando e classificando elementos individuais, como operadores e números. A necessidade do lexer decorre da complexidade inerente à interpretação de código, que exigem uma representação estruturada e simplificada para um processamento eficiente.
+
+Ao dividir a string em unidades menores, os tokens, o lexer facilita o trabalho subsequente do parser. Cada token representa uma peça fundamental da linguagem de programação, permitindo que o compilador identifique e compreenda a estrutura e a semântica do código.
+
+#### Parse
+
+O **parse** constitui uma fase fundamental do processo de compilação, seguindo o lexer. Enquanto o lexer converte o código-fonte em tokens, o parser utiliza esses tokens para construir uma representação hierárquica conhecida como árvore sintática abstrata (AST). Essa árvore reflete a estrutura gramatical do programa, o que facilita a sua análise e a construção.
+
+Assim, o código do parser é composto por diversas funções auxiliares, cada uma delas dedicada a analisar e processar tipos específicos de instruções ou expressões da linguagem.
+
+**Funções de Instrução (`parseAssign`, `parseIfThenElse`, `parseWhile`):**
+   - Cada uma dessas funções é especializada em analisar uma instrução específica da linguagem (atribuição, estrutura condicional `if-then-else` e repetição `while`).
+   - Retornam uma estrutura de dados representando a instrução e a lista de tokens restantes.
+
+**Funções de Aritmética (`parseAexp`, `parseMultIntPar`, `parseIntPar`):**
+   - Responsáveis por analisar expressões aritméticas, lidando com adição, subtração, multiplicação e operações com números e variáveis.
+   
+**Funções de Booleanos (`parseBexp`, `parseEqBNegEqALeBoolPar`, `parseNegEqALeBoolPar`, `parseEqALeBoolPar`, `parseLeBoolPar`, `parseBoolPar`):**
+   - Dedicadas à análise de expressões booleanas, incluindo operações de igualdade, negação, e comparações.
+
+A hierarquia de operações é um princípio fundamental na análise sintática, garantindo que as expressões sejam avaliadas corretamente, respeitando a precedência e a associatividade dos operadores. Neste contexto, essa hierarquia é mantida cuidadosamente para as operações aritméticas e booleanas.
+
+No caso das operações aritméticas, como adição (PlusTok), subtração (MinusTok), e multiplicação (MultTok), a hierarquia é preservada na função parseAexp. Esta função chama **parseMultIntPar**, que, por sua vez, chama **parseIntPar**. Dessa forma, a análise é realizada de acordo com a prioridade dessas operações, garantindo que a multiplicação seja tratada antes da adição e subtração.
+
+No que diz respeito às operações booleanas, a hierarquia é respeitada na função parseBexp. Esta função chama **parseEqBNegEqALeBoolPar** (lida com igualdade entre booleanos), que, por sua vez, chama **parseNegEqALeBoolPar** (lida com a negação), que por sua vez, chama **parseEqALeBoolPar** (lida com igualdade entre aritmética), que por sua vez, chama **parseLeBoolPar** (lida com a operação menor ou igual entre aritmética), e por fiz, chama **parseBoolPar** (lida com booleanos e parênteses). A hierarquia é mantida ao chamar as funções de forma sequencial, garantindo a avaliação correta das operações booleanas.
+
+O código apresenta uma implementação cuidadosa e precisa no tratamento de parênteses, vital para assegurar a correta análise sintática das expressões. Na função **parseIntPar** e **parseBoolPar**, responsáveis por analisar expressões inteiras e booleanas, respetivamente, a presença de parênteses é estrategicamente considerada. Com a presença de um parêntese de abertura (**OpenTok**), a função invoca recursivamente **parseAexp** e **parseBexp**, respetivamente, para analisar a expressão contida dentro dos parênteses. Em seguida, verifica a presença do parêntese de fecho correspondente (**CloseTok**). Esta abordagem garante que as expressões contidas nos parênteses sejam avaliadas primeiro, seguindo a ordem estabelecida pela hierarquia de operações aritméticas e booleanas. Da mesma forma, na função **getInstructions**, que divide a lista de tokens em partes correspondentes a instruções específicas, o código lida adequadamente com parênteses. Ao encontrar um parêntese de abertura, a função chama recursivamente a si mesma, garantindo que as instruções dentro dos parênteses sejam processadas corretamente.
+
+**Funções Principais (`parse`, `parseAux`):**
+   - Utiliza as funções auxiliares mencionadas acima para realizar a análise sintática geral da lista de tokens.
+   - Itera sobre as instruções, construindo a AST do programa à medida que avança.
+
+
+
 
 
 
