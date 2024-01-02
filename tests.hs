@@ -101,9 +101,7 @@ test12' :: Bool
 test12' = testParser "i := 10; fact := 1; while (not(i == 1)) do (fact := fact * i; i := i - 1;);" == ("","fact=3628800,i=1")
 
 tests' :: Bool
-tests' = test1 && test2 && test3 && test4 && test5 && test6 && test7 && test8 && test9 && test10 && test11 && test12
-
-
+tests' = test1' && test2' && test3' && test4' && test5' && test6' && test7' && test8' && test9' && test10' && test11' && test12'
 
 -- Exemplo de programa simples: x := 10;
 program1 :: Program
